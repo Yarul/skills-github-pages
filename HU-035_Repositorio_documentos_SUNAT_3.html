@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIIP - HU-035 Repositorio de documentos remitidos por SUNAT</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+body { font-family:'Inter',sans-serif; background-color:#f8fafc; }
+.toast-enter { transform:translateY(-100%); opacity:0; }
+.toast-show { transform:translateY(0); opacity:1; transition:all .3s ease-out; }
+.drag-active { border-color:#2563eb !important; background-color:#eff6ff !important; }
+.fade-in { animation: fadeIn .2s ease-out; }
+@keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+.chevron { transition: transform .2s ease; }
+.chevron.open { transform: rotate(90deg); }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex">
+
+<div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- Navegación SIIP -->
+<aside class="w-60 bg-[#0b1120] text-slate-300 shrink-0 min-h-screen py-5 flex flex-col">
+  <div class="px-5 flex items-center gap-2 mb-8">
+    <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center"><i class="fa-solid fa-shield-halved text-white text-sm"></i></div>
+    <div><p class="text-white font-bold text-sm leading-none">SIIP</p><p class="text-[10px] text-slate-500 leading-tight">Sistema Integrado de<br>Información Previsional</p></div>
+  </div>
+  <nav class="flex-1 space-y-0.5 text-sm">
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-house w-4"></i> Inicio</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-scale-balanced w-4"></i> Conciliación SNP</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-white font-semibold"><i class="fa-solid fa-folder-open w-4"></i> Repositorio SUNAT</p>
+    <p class="pl-11 py-1.5 bg-blue-600/90 text-white rounded-lg mx-2 pr-3 font-medium cursor-pointer">Documentos periódicos</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-chart-line w-4"></i> Proyección de recaudación</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-sliders w-4"></i> Configuración</p>
+  </nav>
+  <p class="flex items-center gap-2 px-5 py-2 text-slate-400 hover:text-white cursor-pointer text-sm"><i class="fa-solid fa-arrow-right-from-bracket w-4"></i> Cerrar sesión</p>
+</aside>
+
+<!-- Contenido Principal -->
+<div class="flex-1 flex flex-col">
+
+<header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-lg font-bold text-slate-800">HU-M2.1.2.1 - 035 · Repositorio de documentos remitidos periódicamente por SUNAT</h1>
+    <p class="text-xs text-slate-500">EPR07R11 · EPR07R16 · EPR07R20 · Oficio de comisión y recaudación bruta/neta · Oficio de notas de ajuste</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 border-l border-slate-200 pl-4">
+      <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">EC</div>
+      <div class="text-xs"><p class="font-semibold text-slate-800">Elsa Chuquiano</p><p class="text-slate-500">Analista de Recaudación</p></div>
+    </div>
+  </div>
+</header>
+
+<main class="flex-1 p-8 space-y-6">
+
+  <!-- Filtros -->
+  <div class="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap items-end gap-3">
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Subproceso</label>
+      <select id="f-subproceso" onchange="renderTabla()" class="border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white font-medium min-w-[260px] focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <option value="">Todos los subprocesos</option>
+        <option value="M2.1.2.1">M2.1.2.1 - Registro y control de ingresos SNP</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de documento</label>
+      <select id="f-tipo" onchange="renderTabla()" class="border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white font-medium min-w-[220px] focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <option value="">Todos los tipos</option>
+        <option value="EPR07R11">EPR07R11 · Estadística diaria de abonos</option>
+        <option value="EPR07R16">EPR07R16 · Estadística diaria (año anterior)</option>
+        <option value="EPR07R20">EPR07R20 · Estadísticas de recaudación</option>
+        <option value="OFICIO_COMISION">Oficio de comisión y recaudación bruta/neta</option>
+        <option value="OFICIO_AJUSTE">Oficio de notas de ajuste</option>
+        <option value="SIN_CLASIFICAR">Documento sin clasificar</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Periodo</label>
+      <select id="f-periodo" onchange="renderTabla()" class="border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <option value="">Todos los periodos</option>
+        <option value="2026-09">Setiembre 2026</option>
+        <option value="2026-08">Agosto 2026</option>
+        <option value="2026-07">Julio 2026</option>
+        <option value="2026-06">Junio 2026</option>
+      </select>
+    </div>
+    <div class="flex-1 min-w-[180px]">
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Buscar por nombre de archivo</label>
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input id="f-texto" oninput="renderTabla()" type="text" placeholder="Ej. EPR07R20_Julio2026.pdf" class="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+    </div>
+    <button onclick="document.getElementById('modal-upload').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5">
+      <i class="fa-solid fa-cloud-arrow-up"></i> Cargar documento manual
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+    <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-[10px] text-slate-500 font-semibold uppercase">Documentos vigentes</p><p class="text-2xl font-extrabold text-slate-800 mt-1" id="kpi-total">—</p></div>
+    <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-[10px] text-slate-500 font-semibold uppercase">Tipos distintos</p><p class="text-2xl font-extrabold text-slate-800 mt-1" id="kpi-tipos">—</p></div>
+    <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-[10px] text-slate-500 font-semibold uppercase">Con más de 1 versión</p><p class="text-2xl font-extrabold text-amber-700 mt-1" id="kpi-versionados">—</p></div>
+    <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-[10px] text-slate-500 font-semibold uppercase">Sin clasificar</p><p class="text-2xl font-extrabold text-rose-700 mt-1" id="kpi-sinclasificar">—</p></div>
+  </div>
+
+  <!-- Tabla / Repositorio -->
+  <div class="bg-white rounded-xl border border-slate-200 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-folder-tree text-blue-600 mr-1.5"></i>Documentos del repositorio</p>
+      <span class="text-[11px] text-slate-500" id="contador-resultados"></span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs border-collapse">
+        <thead>
+          <tr class="text-slate-500 border-b border-slate-200">
+            <th class="text-left py-2 font-semibold">Subproceso</th>
+            <th class="w-6"></th>
+            <th class="text-left py-2 font-semibold">Tipo de documento</th>
+            <th class="text-left py-2 font-semibold">Periodo</th>
+            <th class="text-left py-2 font-semibold">Archivo vigente</th>
+            <th class="text-left py-2 font-semibold">Fecha de recepción</th>
+            <th class="text-center py-2 font-semibold">Versiones</th>
+            <th class="text-center py-2 font-semibold">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-repositorio"></tbody>
+      </table>
+    </div>
+    <div id="estado-vacio" class="hidden text-center py-10 text-slate-400">
+      <i class="fa-solid fa-folder-open text-3xl mb-2"></i>
+      <p class="text-sm font-semibold">No existen documentos disponibles para los criterios seleccionados</p>
+      <p class="text-xs">Ajuste el periodo o tipo de documento para ampliar la búsqueda.</p>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- Modal Carga manual -->
+<div id="modal-upload" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-cloud-arrow-up text-blue-600"></i> Carga manual de documento SUNAT</h3>
+      <button onclick="cerrarModal('modal-upload')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de Subproceso</label>
+      <select id="upload-subproceso" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        <option value="M2.1.2.1">M2.1.2.1 - Registro y control de ingresos SNP</option>
+      </select>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo de documento</label>
+        <select id="upload-tipo" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <option>EPR07R11</option><option>EPR07R16</option><option>EPR07R20</option>
+          <option>Oficio de comisión y recaudación bruta/neta</option><option>Oficio de notas de ajuste</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-600 mb-1">Periodo</label>
+        <input type="month" value="2026-09" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+    </div>
+    <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-blue-50/40 transition cursor-pointer" onclick="cargarDocumento()">
+      <i class="fa-solid fa-cloud-arrow-up text-blue-600 text-2xl mb-2"></i>
+      <p class="font-semibold text-xs text-slate-800">Arrastre aquí el documento o haga clic para examinar</p>
+      <p class="text-[11px] text-slate-500 mt-1">Formatos admitidos: PDF, XLSX · Máximo 10 MB</p>
+    </div>
+    <div class="flex flex-wrap gap-2 text-[11px]">
+      <button onclick="simularExcepcion('duplicado')" class="border border-slate-300 rounded-lg px-2.5 py-1 hover:bg-slate-100">Simular: documento duplicado</button>
+      <button onclick="simularExcepcion('formato')" class="border border-slate-300 rounded-lg px-2.5 py-1 hover:bg-slate-100">Simular: formato no soportado</button>
+      <button onclick="simularExcepcion('sintipo')" class="border border-slate-300 rounded-lg px-2.5 py-1 hover:bg-slate-100">Simular: sin tipo identificable</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal historial de versiones -->
+<div id="modal-versiones" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-clock-rotate-left text-blue-600"></i> Historial de versiones</h3>
+      <button onclick="cerrarModal('modal-versiones')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <p class="text-xs text-slate-600">Las versiones anteriores se conservan sin sobrescribirse (RN-0154). Solo la más reciente es la vigente para la conciliación y el reporte.</p>
+    <div id="lista-versiones" class="space-y-2 text-xs"></div>
+    <div class="flex justify-end pt-2 border-t">
+      <button onclick="cerrarModal('modal-versiones')" class="bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUBPROCESOS = {
+  'M2.1.2.1': 'M2.1.2.1 - Registro y control de ingresos SNP'
+};
+
+const DOCUMENTOS = [
+  { subproceso:'M2.1.2.1', tipo:'EPR07R20', periodo:'2026-09', nombre:'EPR07R20_Setiembre2026_v1.pdf', fecha:'01/09/2026 04:05', versiones:[{v:1,fecha:'01/09/2026 04:05', archivo:'EPR07R20_Setiembre2026_v1.pdf'}] },
+  { subproceso:'M2.1.2.1', tipo:'EPR07R11', periodo:'2026-09', nombre:'EPR07R11_Setiembre2026_v2.pdf', fecha:'15/09/2026 07:40', versiones:[
+      {v:2,fecha:'15/09/2026 07:40', archivo:'EPR07R11_Setiembre2026_v2.pdf', nota:'Reproceso recibido vía esquema de novedades'},
+      {v:1,fecha:'10/09/2026 06:05', archivo:'EPR07R11_Setiembre2026_v1.pdf'}
+    ] },
+  { subproceso:'M2.1.2.1', tipo:'OFICIO_COMISION', periodo:'2026-08', nombre:'Oficio_001213-2026-SUNAT-8H1400.pdf', fecha:'02/09/2026 10:12', versiones:[{v:1,fecha:'02/09/2026 10:12', archivo:'Oficio_001213-2026-SUNAT-8H1400.pdf'}] },
+  { subproceso:'M2.1.2.1', tipo:'EPR07R16', periodo:'2025-09', nombre:'EPR07R16_Setiembre2025.pdf', fecha:'01/10/2025 05:30', versiones:[{v:1,fecha:'01/10/2025 05:30', archivo:'EPR07R16_Setiembre2025.pdf'}] },
+  { subproceso:'M2.1.2.1', tipo:'EPR07R20', periodo:'2026-08', nombre:'EPR07R20_Agosto2026_v1.pdf', fecha:'01/08/2026 04:10', versiones:[{v:1,fecha:'01/08/2026 04:10', archivo:'EPR07R20_Agosto2026_v1.pdf'}] },
+  { subproceso:'M2.1.2.1', tipo:'OFICIO_AJUSTE', periodo:'2026-08', nombre:'Oficio_NotasAjuste_Agosto2026.pdf', fecha:'04/09/2026 09:00', versiones:[{v:1,fecha:'04/09/2026 09:00', archivo:'Oficio_NotasAjuste_Agosto2026.pdf'}] },
+  { subproceso:'M2.1.2.1', tipo:'EPR07R11', periodo:'2026-08', nombre:'EPR07R11_Agosto2026_v1.pdf', fecha:'01/08/2026 06:00', versiones:[{v:1,fecha:'01/08/2026 06:00', archivo:'EPR07R11_Agosto2026_v1.pdf'}] },
+  { subproceso:'M2.1.2.1', tipo:'SIN_CLASIFICAR', periodo:'2026-09', nombre:'Documento_20260913_sinformato.pdf', fecha:'13/09/2026 15:22', versiones:[{v:1,fecha:'13/09/2026 15:22', archivo:'Documento_20260913_sinformato.pdf'}] },
+  { subproceso:'M2.1.2.1', tipo:'EPR07R11', periodo:'2026-07', nombre:'EPR07R11_Julio2026_v1.pdf', fecha:'01/07/2026 06:00', versiones:[{v:1,fecha:'01/07/2026 06:00', archivo:'EPR07R11_Julio2026_v1.pdf'}] },
+  { subproceso:'M2.1.2.1', tipo:'EPR07R20', periodo:'2026-07', nombre:'EPR07R20_Julio2026_v1.pdf', fecha:'01/07/2026 04:05', versiones:[{v:1,fecha:'01/07/2026 04:05', archivo:'EPR07R20_Julio2026_v1.pdf'}] }
+];
+
+const NOMBRES_TIPO = {
+  EPR07R11:'EPR07R11 · Estadística diaria de abonos', EPR07R16:'EPR07R16 · Estadística diaria (año anterior)',
+  EPR07R20:'EPR07R20 · Estadísticas de recaudación', OFICIO_COMISION:'Oficio de comisión y recaudación bruta/neta',
+  OFICIO_AJUSTE:'Oficio de notas de ajuste', SIN_CLASIFICAR:'Documento sin clasificar'
+};
+const ICONO_TIPO = {
+  EPR07R11:'fa-file-lines text-blue-600', EPR07R16:'fa-file-lines text-blue-500', EPR07R20:'fa-table-list text-indigo-600',
+  OFICIO_COMISION:'fa-file-invoice text-emerald-600', OFICIO_AJUSTE:'fa-file-pen text-amber-600', SIN_CLASIFICAR:'fa-file-circle-question text-rose-600'
+};
+
+function showToast(titulo, mensaje, tipo) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const bg = tipo==='success' ? 'bg-emerald-700' : tipo==='error' ? 'bg-rose-700' : 'bg-amber-700';
+  toast.className = 'pointer-events-auto p-3 rounded-xl shadow-lg text-white text-xs max-w-sm ' + bg + ' toast-enter';
+  toast.innerHTML = '<strong class="block font-bold">' + titulo + '</strong><span class="text-[11px] opacity-90">' + mensaje + '</span>';
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add('toast-show'), 10);
+  setTimeout(() => { toast.classList.remove('toast-show'); setTimeout(() => toast.remove(), 300); }, 4200);
+}
+
+function periodoLabel(p){
+  const [y,m] = p.split('-');
+  const meses = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Setiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'};
+  return meses[m] + ' ' + y;
+}
+
+function renderTabla(){
+  const fsubproceso = document.getElementById('f-subproceso').value;
+  const ftipo = document.getElementById('f-tipo').value;
+  const fperiodo = document.getElementById('f-periodo').value;
+  const ftexto = document.getElementById('f-texto').value.toLowerCase();
+
+  const filtrados = DOCUMENTOS.filter(d =>
+    (!fsubproceso || d.subproceso === fsubproceso) &&
+    (!ftipo || d.tipo === ftipo) &&
+    (!fperiodo || d.periodo === fperiodo) &&
+    (!ftexto || d.nombre.toLowerCase().includes(ftexto))
+  );
+
+  document.getElementById('contador-resultados').innerText = filtrados.length + ' documento(s) encontrado(s)';
+  document.getElementById('estado-vacio').classList.toggle('hidden', filtrados.length !== 0);
+
+  const tbody = document.getElementById('tabla-repositorio');
+  tbody.innerHTML = filtrados.map(d => `
+    <tr class="border-b border-slate-100 hover:bg-slate-50/60">
+      <td class="py-2.5 text-slate-600 whitespace-nowrap"><span class="font-mono font-semibold text-slate-700">${d.subproceso}</span><br><span class="text-[10px] text-slate-400">${SUBPROCESOS[d.subproceso]}</span></td>
+      <td class="text-center"><i class="fa-solid ${ICONO_TIPO[d.tipo]}"></i></td>
+      <td class="py-2.5 font-semibold text-slate-700">${NOMBRES_TIPO[d.tipo]}</td>
+      <td class="py-2.5 text-slate-600">${periodoLabel(d.periodo)}</td>
+      <td class="py-2.5 font-mono text-[11px] text-slate-600">${d.nombre}</td>
+      <td class="py-2.5 text-slate-500">${d.fecha}</td>
+      <td class="py-2.5 text-center">
+        ${d.versiones.length > 1
+          ? `<button onclick='abrirVersiones(${JSON.stringify(d).replace(/'/g,"&apos;")})' class="text-[11px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full hover:bg-amber-200">${d.versiones.length} versiones</button>`
+          : `<span class="text-[11px] text-slate-400">1 versión</span>`}
+      </td>
+      <td class="py-2.5 text-center">
+        <button onclick="showToast('Descarga iniciada', 'Descargando ${d.nombre}…', 'success')" class="text-blue-600 hover:text-blue-800 text-xs px-2" title="Descargar"><i class="fa-solid fa-download"></i></button>
+        <button onclick="showToast('Vista previa', 'Abriendo vista previa de ${d.nombre}…', 'warning')" class="text-slate-500 hover:text-slate-700 text-xs px-2" title="Ver"><i class="fa-solid fa-eye"></i></button>
+      </td>
+    </tr>
+  `).join('');
+
+  document.getElementById('kpi-total').innerText = filtrados.length;
+  document.getElementById('kpi-tipos').innerText = new Set(filtrados.map(d=>d.tipo)).size;
+  document.getElementById('kpi-versionados').innerText = filtrados.filter(d=>d.versiones.length>1).length;
+  document.getElementById('kpi-sinclasificar').innerText = filtrados.filter(d=>d.tipo==='SIN_CLASIFICAR').length;
+}
+
+function abrirVersiones(d){
+  document.getElementById('lista-versiones').innerHTML = d.versiones.map((v,i) => `
+    <div class="flex items-center justify-between border border-slate-200 rounded-lg p-2.5 ${i===0?'bg-emerald-50/60 border-emerald-200':''}">
+      <div>
+        <p class="font-semibold text-slate-700 font-mono">${v.archivo}</p>
+        <p class="text-[10px] text-slate-500">${v.fecha}${v.nota ? ' · '+v.nota : ''}</p>
+      </div>
+      ${i===0 ? '<span class="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded-full">Vigente</span>' : '<button class="text-[11px] text-blue-600 hover:underline"><i class="fa-solid fa-download"></i></button>'}
+    </div>
+  `).join('');
+  document.getElementById('modal-versiones').classList.remove('hidden');
+}
+
+function cerrarModal(id){ document.getElementById(id).classList.add('hidden'); }
+
+function cargarDocumento(){
+  showToast('Documento recibido', 'El documento fue almacenado en el repositorio, asociado al periodo y tipo seleccionados.', 'success');
+  cerrarModal('modal-upload');
+}
+
+function simularExcepcion(tipo){
+  if (tipo === 'duplicado') showToast('Documento duplicado', 'Ya existe un documento idéntico para este periodo y tipo. Se descarta la carga y se conserva la versión registrada.', 'error');
+  if (tipo === 'formato') showToast('Formato no soportado', 'El documento remitido tiene un formato distinto a los soportados. Se rechaza el almacenamiento y se notifica la incidencia para carga manual posterior.', 'error');
+  if (tipo === 'sintipo') showToast('Sin tipo identificable', 'No fue posible identificar el tipo de documento. Se almacenó como "Documento sin clasificar" para su clasificación manual.', 'warning');
+}
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-active'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-active'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-active'); cargarDocumento(); });
+
+renderTabla();
+</script>
+</body>
+</html>

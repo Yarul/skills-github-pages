@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIIP - HU-034 Recepción de estadísticas reprocesadas y re-ejecución de conciliación</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+body { font-family:'Inter',sans-serif; background-color:#f8fafc; }
+.toast-enter { transform:translateY(-100%); opacity:0; }
+.toast-show { transform:translateY(0); opacity:1; transition:all .3s ease-out; }
+.nav-active { background:#2563eb; color:#fff; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+.fade-in { animation: fadeIn .25s ease-out; }
+@keyframes fadeIn { from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex">
+
+<div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- Navegación SIIP -->
+<aside class="w-60 bg-[#0b1120] text-slate-300 shrink-0 min-h-screen py-5 flex flex-col">
+  <div class="px-5 flex items-center gap-2 mb-8">
+    <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center"><i class="fa-solid fa-shield-halved text-white text-sm"></i></div>
+    <div><p class="text-white font-bold text-sm leading-none">SIIP</p><p class="text-[10px] text-slate-500 leading-tight">Sistema Integrado de<br>Información Previsional</p></div>
+  </div>
+  <nav class="flex-1 space-y-0.5 text-sm">
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-house w-4"></i> Inicio</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-white font-semibold"><i class="fa-solid fa-scale-balanced w-4"></i> Conciliación SNP</p>
+    <p class="pl-11 py-1.5 bg-blue-600/90 text-white rounded-lg mx-2 pr-3 font-medium cursor-pointer">Recepción de reprocesos SUNAT</p>
+    <p class="pl-11 py-1.5 text-slate-400 hover:text-white cursor-pointer">Comparación de abonos EPR07R11</p>
+    <p class="pl-11 py-1.5 text-slate-400 hover:text-white cursor-pointer">Resultado de conciliación</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-folder-open w-4"></i> Repositorio SUNAT</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-chart-line w-4"></i> Proyección de recaudación</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-sliders w-4"></i> Configuración</p>
+  </nav>
+  <p class="flex items-center gap-2 px-5 py-2 text-slate-400 hover:text-white cursor-pointer text-sm"><i class="fa-solid fa-arrow-right-from-bracket w-4"></i> Cerrar sesión</p>
+</aside>
+
+<!-- Contenido Principal -->
+<div class="flex-1 flex flex-col">
+
+<header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-lg font-bold text-slate-800">HU-M2.1.2.1 - 034 · Recepción de estadísticas reprocesadas por SUNAT y re-ejecución de la conciliación del SNP</h1>
+    <p class="text-xs text-slate-500">Estadística EPR07R11 · Conciliación de abonos diarios vs Estado Bancario del BN</p>
+  </div>
+  <div class="flex items-center gap-4">
+    <button onclick="simularEscenario('incompleta')" class="bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition">
+      <i class="fa-solid fa-flask"></i> Simular: estadística incompleta
+    </button>
+    <div class="flex items-center gap-2 border-l border-slate-200 pl-4">
+      <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">EC</div>
+      <div class="text-xs"><p class="font-semibold text-slate-800">Elsa Chuquiano</p><p class="text-slate-500">Analista de Recaudación</p></div>
+    </div>
+  </div>
+</header>
+
+<main class="flex-1 p-8 space-y-6">
+
+  <!-- Selector de Periodo -->
+  <div class="flex flex-wrap items-center gap-3">
+    <label class="text-xs font-semibold text-slate-600">Periodo de conciliación:</label>
+    <select id="select-periodo" onchange="cambiarPeriodo(this.value)" class="border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      <option value="set2026" selected>Setiembre 2026</option>
+      <option value="ago2026">Agosto 2026</option>
+      <option value="jul2026">Julio 2026</option>
+    </select>
+    <span id="badge-estado-periodo" class="text-[11px] font-bold px-2.5 py-1 rounded-full"></span>
+  </div>
+
+  <!-- Alerta de nueva versión reprocesada -->
+  <div id="alerta-reproceso" class="hidden fade-in bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+    <i class="fa-solid fa-circle-info text-blue-600 mt-0.5"></i>
+    <div class="flex-1 text-xs">
+      <p class="font-bold text-blue-900">SUNAT ha remitido una nueva versión reprocesada de la estadística (EPR07R11 y los demás archivos) de Fecha 15/09/2026</p>
+      <p class="text-blue-700 mt-0.5">Recibida a través del esquema de novedades. Esta versión fue asociada automáticamente al periodo y marcada como vigente para la conciliación (RN-0149). Se recomienda re-ejecutar la comparación para actualizar el resultado.</p>
+    </div>
+    <span class="text-[10px] bg-blue-600 text-white font-bold px-2 py-1 rounded-full whitespace-nowrap">Nueva · hace 12 min</span>
+  </div>
+
+  <!-- Alerta de bloqueo (periodo ya reportado) -->
+  <div id="alerta-bloqueo" class="hidden fade-in bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-start gap-3">
+    <i class="fa-solid fa-lock text-rose-600 mt-0.5"></i>
+    <div class="flex-1 text-xs">
+      <p class="font-bold text-rose-900">Periodo ya comunicado mediante memorando y actas de conciliación</p>
+      <p class="text-rose-700 mt-0.5">Se recibió una versión reprocesada de EPR07R11 para este periodo, pero no es posible re-ejecutar la comparación porque el memorando y las actas ya fueron remitidos (RN-0151). El resultado reportado puede diferir del que arrojaría el reproceso. Excepción: si el dato reprocesado corresponde al EPR-11, puede actualizarse de forma manual únicamente para fines del compendio estadístico.</p>
+    </div>
+    <button onclick="abrirModalActualizacionManual()" class="text-[11px] border border-rose-300 text-rose-700 font-bold px-3 py-1.5 rounded-lg hover:bg-rose-100 transition whitespace-nowrap">Actualizar EPR-11 manualmente</button>
+  </div>
+
+  <div class="space-y-6">
+
+    <!-- Estado de la conciliación -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-1">
+        <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-scale-balanced text-blue-600 mr-1.5"></i>Estado de la conciliación del periodo</p>
+        <p id="res-fecha" class="text-[11px] text-slate-500 italic"></p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="resumen-conciliacion">
+        <div class="bg-white rounded-lg p-4 border border-slate-200 border-t-4 border-t-emerald-500">
+          <p class="text-[11px] text-slate-500 font-semibold">Abonos coincidentes</p>
+          <p id="res-coincidentes" class="text-2xl font-extrabold text-slate-800 mt-1">—</p>
+          <p id="res-coincidentes-sub" class="text-[11px] text-emerald-700 mt-0.5"></p>
+        </div>
+        <div class="bg-white rounded-lg p-4 border border-slate-200 border-t-4 border-t-blue-500">
+          <p class="text-[11px] text-slate-500 font-semibold">Excluidos (penalidad/ajuste)</p>
+          <p id="res-excluidos" class="text-2xl font-extrabold text-slate-800 mt-1">—</p>
+          <p class="text-[11px] text-blue-700 mt-0.5">Sin acción automática adicional</p>
+        </div>
+        <div class="bg-white rounded-lg p-4 border border-slate-200 border-t-4 border-t-amber-500">
+          <p class="text-[11px] text-slate-500 font-semibold">Diferencias sin clasificar</p>
+          <p id="res-sinclasificar" class="text-2xl font-extrabold text-slate-800 mt-1">—</p>
+          <p class="text-[11px] text-amber-700 mt-0.5">Pendiente de consulta a SUNAT</p>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs border-collapse">
+          <thead>
+            <tr class="text-slate-500 bg-slate-50 border-b border-slate-200">
+              <th class="text-left py-2 px-2 font-semibold">Fecha</th>
+              <th class="text-left py-2 px-2 font-semibold">Nro. Nota de Abono</th>
+              <th class="text-right py-2 px-2 font-semibold">EPR07R11 (S/)</th>
+              <th class="text-right py-2 px-2 font-semibold">Estado Bancario (S/)</th>
+              <th class="text-center py-2 px-2 font-semibold">Cuadra</th>
+              <th class="text-left py-2 px-2 font-semibold">Clasificación</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-detalle-conciliacion"></tbody>
+        </table>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
+        <button onclick="verHistorialResultados()" class="text-xs border border-slate-300 text-slate-700 font-semibold rounded-lg px-4 py-2 hover:bg-slate-100 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-clock-rotate-left text-slate-500"></i> Ver resultado anterior
+        </button>
+        <button id="btn-reejecutar" onclick="reejecutarComparacion()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5">
+          <i class="fa-solid fa-rotate"></i> Re-ejecutar comparación
+        </button>
+      </div>
+    </div>
+
+    <!-- Historial de versiones EPR07R11 -->
+    <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+      <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-code-compare text-blue-600 mr-1.5"></i>Historial de versiones · Estadística EPR07R11</p>
+      <table class="w-full text-xs border-collapse">
+        <thead>
+          <tr class="text-slate-500 border-b border-slate-200">
+            <th class="text-left py-2 font-semibold">Versión</th>
+            <th class="text-left py-2 font-semibold">Origen</th>
+            <th class="text-left py-2 font-semibold">Fecha de recepción</th>
+            <th class="text-center py-2 font-semibold">Vigente</th>
+            <th class="text-center py-2 font-semibold">Estado</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-versiones"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- Modal: Progreso de re-ejecución -->
+<div id="modal-progreso" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 text-center">
+    <i class="fa-solid fa-rotate text-blue-600 text-3xl spin"></i>
+    <p class="font-bold text-sm text-slate-800">Re-ejecutando comparación de abonos…</p>
+    <p class="text-xs text-slate-500">Comparando la totalidad de las notas de abono del periodo contra el Estado Bancario del BN y los reportes posteriores, con la última versión de EPR07R11.</p>
+    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+      <div id="barra-progreso" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Resultado comparativo -->
+<div id="modal-resultado" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 space-y-4">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-circle-check text-emerald-600"></i> Comparación re-ejecutada exitosamente</h3>
+      <button onclick="cerrarModal('modal-resultado')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <p class="text-xs text-slate-600">El resultado de la comparación previa del periodo fue reemplazado por el nuevo resultado obtenido con la versión reprocesada (RN-0150).</p>
+    <div class="grid grid-cols-2 gap-4 text-xs">
+      <div class="border border-slate-200 rounded-lg p-3 space-y-1.5">
+        <p class="font-bold text-slate-500 uppercase text-[10px]">Resultado anterior</p>
+        <p>Abonos coincidentes: <span class="font-semibold text-emerald-700" id="prev-coincidentes"></span></p>
+        <p>Excluidos (penalidad/ajuste): <span class="font-semibold text-blue-700" id="prev-excluidos"></span></p>
+        <p>Sin clasificar: <span class="font-semibold text-amber-700" id="prev-sinclasificar"></span></p>
+      </div>
+      <div class="border-2 border-blue-500 rounded-lg p-3 space-y-1.5 bg-blue-50/40">
+        <p class="font-bold text-blue-700 uppercase text-[10px]">Resultado nuevo (vigente)</p>
+        <p>Abonos coincidentes: <span class="font-semibold text-emerald-700" id="new-coincidentes"></span></p>
+        <p>Excluidos (penalidad/ajuste): <span class="font-semibold text-blue-700" id="new-excluidos"></span></p>
+        <p>Sin clasificar: <span class="font-semibold text-amber-700" id="new-sinclasificar"></span></p>
+      </div>
+    </div>
+    <div id="nota-memorando" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800">
+      <i class="fa-solid fa-triangle-exclamation mr-1"></i> Este periodo aún no ha sido informado mediante memorando y actas, por lo que la re-ejecución se realizó sin restricción (RN-0151).
+    </div>
+    <div class="flex justify-end pt-2 border-t">
+      <button onclick="cerrarModal('modal-resultado')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Excepción - estadística incompleta -->
+<div id="modal-incompleta" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 text-center">
+    <i class="fa-solid fa-triangle-exclamation text-rose-600 text-3xl"></i>
+    <p class="font-bold text-sm text-slate-800">Estadística reprocesada incompleta</p>
+    <p class="text-xs text-slate-600">La nueva versión de la estadística EPR07R11 recibida no contiene la totalidad de los días del periodo. No es posible ejecutar la comparación hasta contar con la información completa.</p>
+    <button onclick="cerrarModal('modal-incompleta')" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-5 py-2 rounded-lg">Entendido</button>
+  </div>
+</div>
+
+<!-- Modal: Actualización manual EPR-11 -->
+<div id="modal-manual" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-blue-600"></i> Actualización manual del dato EPR-11</h3>
+      <button onclick="cerrarModal('modal-manual')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <p class="text-xs text-slate-600">Excepción aplicable únicamente cuando el dato reprocesado corresponde al EPR-11. No re-ejecuta la comparación del periodo; solo actualiza el valor para fines del compendio estadístico.</p>
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Nuevo valor EPR-11 (S/)</label>
+      <input type="text" value="5,836,572.67" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Motivo / sustento</label>
+      <textarea rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Ej. Reproceso comunicado por SUNAT mediante esquema de novedades el 15/09/2026."></textarea>
+    </div>
+    <div class="flex justify-end gap-2 pt-2 border-t">
+      <button onclick="cerrarModal('modal-manual')" class="text-xs border border-slate-300 text-slate-700 font-semibold rounded-lg px-4 py-2 hover:bg-slate-100">Cancelar</button>
+      <button onclick="guardarManual()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg">Guardar actualización</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Detalle de comparación de abonos (EPR07R11 vs Estado Bancario del BN) ----
+// cuadra: 'ok' = coincide | 'excl' = excluido (penalidad bancaria / nota de ajuste, no aplica cuadre) | 'no' = diferencia sin clasificar
+const JULIO_ROWS = [
+  {fecha:'31/07/2026', nro:'2404443', epr:123291.74, banco:123291.74, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'2404451', epr:267123.15, banco:267123.15, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'3401618', epr:12526.15, banco:12526.15, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'3401626', epr:58551.97, banco:58551.97, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'4822471', epr:2582.33, banco:2582.33, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'9410414', epr:32885.40, banco:32885.40, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'9410422', epr:10197.22, banco:10197.22, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'11897843', epr:43884.23, banco:43884.23, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'11897851', epr:71796.25, banco:71796.25, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'18436931', epr:317313.54, banco:317313.54, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'18436957', epr:4880636.86, banco:4880636.86, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'38867164', epr:508.45, banco:508.45, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'38867172', epr:12768.37, banco:12768.37, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'66827712', epr:3860.19, banco:3860.19, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'67872665', epr:156432.84, banco:156432.84, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'69827861', epr:8296.20, banco:8296.20, cuadra:'ok'},
+  {fecha:'31/07/2026', nro:'38967199', epr:null, banco:42.50, cuadra:'excl', clasif:'Penalidad bancaria (3er dígito "9")'},
+  {fecha:'31/07/2026', nro:'60000858', epr:null, banco:45401.03, cuadra:'excl', clasif:'Nota de ajuste (inicia con "600")'},
+  {fecha:'31/07/2026', nro:'18436980', epr:950.00, banco:null, cuadra:'no', clasif:'Sin clasificar (pendiente de consulta a SUNAT)'}
+];
+
+const SET_ROWS_V1 = [
+  {fecha:'15/09/2026', nro:'70011234', epr:45210.00, banco:45210.00, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011242', epr:12870.50, banco:12870.50, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011250', epr:98650.10, banco:98650.10, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011268', epr:3220.75, banco:3220.75, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011276', epr:154200.00, banco:154200.00, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011284', epr:6890.40, banco:6890.40, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011292', epr:210500.33, banco:210500.33, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011305', epr:990.15, banco:990.15, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011313', epr:47230.60, banco:47230.60, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70011321', epr:15800.00, banco:15800.00, cuadra:'ok'},
+  {fecha:'15/09/2026', nro:'70921009', epr:null, banco:38.20, cuadra:'excl', clasif:'Penalidad bancaria (3er dígito "9")'},
+  {fecha:'15/09/2026', nro:'60002214', epr:null, banco:22150.90, cuadra:'excl', clasif:'Nota de ajuste (inicia con "600")'},
+  {fecha:'15/09/2026', nro:'70031187', epr:8420.00, banco:null, cuadra:'no', clasif:'Sin clasificar (pendiente de consulta a SUNAT)'},
+  {fecha:'15/09/2026', nro:'70031195', epr:null, banco:3150.75, cuadra:'no', clasif:'Sin clasificar (pendiente de consulta a SUNAT)'}
+];
+// Tras el reproceso, las 2 diferencias que estaban sin clasificar quedan cuadradas (RN-0150: se compara la totalidad de notas del periodo)
+const SET_ROWS_V2 = SET_ROWS_V1.map(r => {
+  if (r.nro === '70031187') return {...r, banco:8420.00, cuadra:'ok', clasif:undefined};
+  if (r.nro === '70031195') return {...r, epr:3150.75, cuadra:'ok', clasif:undefined};
+  return r;
+});
+
+const AGO_ROWS = [
+  {fecha:'31/08/2026', nro:'65010012', epr:88230.44, banco:88230.44, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010020', epr:15420.10, banco:15420.10, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010038', epr:302150.00, banco:302150.00, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010046', epr:4980.55, banco:4980.55, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010053', epr:67200.30, banco:67200.30, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010061', epr:990.00, banco:990.00, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010079', epr:154980.75, banco:154980.75, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010087', epr:23100.60, banco:23100.60, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010095', epr:8420.00, banco:8420.00, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010108', epr:56230.90, banco:56230.90, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010116', epr:3120.45, banco:3120.45, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010124', epr:77450.00, banco:77450.00, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010132', epr:920.35, banco:920.35, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010140', epr:41200.80, banco:41200.80, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65010158', epr:12980.00, banco:12980.00, cuadra:'ok'},
+  {fecha:'31/08/2026', nro:'65020017', epr:null, banco:51.30, cuadra:'excl', clasif:'Penalidad bancaria (3er dígito "9")'},
+  {fecha:'31/08/2026', nro:'60003321', epr:null, banco:18400.25, cuadra:'excl', clasif:'Nota de ajuste (inicia con "600")'}
+];
+
+const PERIODOS = {
+  set2026: {
+    nombre: 'Setiembre 2026', estado: 'reproceso', badge: {text:'Reproceso pendiente de re-ejecutar', cls:'bg-blue-100 text-blue-800'},
+    fecha: 'Última comparación: 10/09/2026 08:15 (versión v1)',
+    rows: SET_ROWS_V1, rowsAntes: SET_ROWS_V1, rowsDespues: SET_ROWS_V2,
+    versiones: [
+      {v:'v2', origen:'Esquema de novedades (reproceso)', fecha:'15/09/2026 07:40', vigente:true, estado:'Sin comparar'},
+      {v:'v1', origen:'Carga automática diaria', fecha:'10/09/2026 06:05', vigente:false, estado:'Comparada'}
+    ],
+    bloqueado:false, memorandoEnviado:false
+  },
+  ago2026: {
+    nombre:'Agosto 2026', estado:'bloqueado', badge:{text:'Bloqueado · memorando y actas remitidos', cls:'bg-rose-100 text-rose-800'},
+    fecha: 'Última comparación: 03/09/2026 09:20 (versión v1) · Memorando N° 000576-2026-DGP.SAG-ONP remitido el 05/09/2026',
+    rows: AGO_ROWS,
+    versiones: [
+      {v:'v2', origen:'Esquema de novedades (reproceso)', fecha:'14/09/2026 11:10', vigente:true, estado:'No comparable'},
+      {v:'v1', origen:'Carga automática diaria', fecha:'03/09/2026 06:00', vigente:false, estado:'Comparada'}
+    ],
+    bloqueado:true, memorandoEnviado:true
+  },
+  jul2026: {
+    nombre:'Julio 2026', estado:'normal', badge:{text:'Conciliado · sin reprocesos pendientes', cls:'bg-emerald-100 text-emerald-800'},
+    fecha: 'Última comparación: 02/08/2026 07:50 (versión v1)',
+    rows: JULIO_ROWS,
+    versiones: [
+      {v:'v1', origen:'Carga automática diaria', fecha:'02/08/2026 06:10', vigente:true, estado:'Comparada'}
+    ],
+    bloqueado:false, memorandoEnviado:false
+  }
+};
+let periodoActual = 'set2026';
+
+function showToast(titulo, mensaje, tipo) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const bg = tipo==='success' ? 'bg-emerald-700' : tipo==='error' ? 'bg-rose-700' : 'bg-amber-700';
+  toast.className = 'pointer-events-auto p-3 rounded-xl shadow-lg text-white text-xs max-w-sm ' + bg + ' toast-enter';
+  toast.innerHTML = '<strong class="block font-bold">' + titulo + '</strong><span class="text-[11px] opacity-90">' + mensaje + '</span>';
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add('toast-show'), 10);
+  setTimeout(() => { toast.classList.remove('toast-show'); setTimeout(() => toast.remove(), 300); }, 4200);
+}
+
+function fmt(n){ return n.toLocaleString('es-PE'); }
+function fmt2(n){ return n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+function contarKPI(rows){
+  return {
+    coincidentes: rows.filter(r=>r.cuadra==='ok').length,
+    excluidos: rows.filter(r=>r.cuadra==='excl').length,
+    sinclasificar: rows.filter(r=>r.cuadra==='no').length
+  };
+}
+
+function renderDetalle(rows){
+  document.getElementById('tabla-detalle-conciliacion').innerHTML = rows.map(r => {
+    const epr = (r.epr===null || r.epr===undefined) ? '—' : fmt2(r.epr);
+    const banco = (r.banco===null || r.banco===undefined) ? '—' : fmt2(r.banco);
+    let cuadraHtml;
+    if (r.cuadra === 'ok') cuadraHtml = '<span class="inline-flex items-center gap-1.5 text-emerald-700 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>✓ Cuadra</span>';
+    else if (r.cuadra === 'no') cuadraHtml = '<span class="inline-flex items-center gap-1.5 text-rose-700 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>✗ No cuadra</span>';
+    else cuadraHtml = '<span class="text-slate-400">—</span>';
+    let clasifHtml = '<span class="text-slate-400">—</span>';
+    if (r.clasif) {
+      const esSinClasificar = r.clasif.startsWith('Sin clasificar');
+      const colorCls = esSinClasificar ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700';
+      const dotCls = esSinClasificar ? 'bg-rose-500' : 'bg-amber-500';
+      clasifHtml = `<span class="inline-flex items-center gap-1.5 ${colorCls} text-[11px] font-semibold px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full ${dotCls}"></span>${r.clasif}</span>`;
+    }
+    return `<tr class="border-b border-slate-100">
+      <td class="py-2 px-2 text-slate-500 whitespace-nowrap">${r.fecha}</td>
+      <td class="py-2 px-2 font-mono text-blue-700">${r.nro}</td>
+      <td class="py-2 px-2 text-right font-mono">${epr}</td>
+      <td class="py-2 px-2 text-right font-mono">${banco}</td>
+      <td class="py-2 px-2 text-center whitespace-nowrap">${cuadraHtml}</td>
+      <td class="py-2 px-2">${clasifHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+function pintarPeriodo(){
+  const p = PERIODOS[periodoActual];
+  document.getElementById('badge-estado-periodo').className = 'text-[11px] font-bold px-2.5 py-1 rounded-full ' + p.badge.cls;
+  document.getElementById('badge-estado-periodo').innerText = p.badge.text;
+
+  const k = contarKPI(p.rows);
+  document.getElementById('res-coincidentes').innerText = k.coincidentes;
+  document.getElementById('res-coincidentes-sub').innerText = 'Periodo: ' + p.nombre;
+  document.getElementById('res-excluidos').innerText = k.excluidos;
+  document.getElementById('res-sinclasificar').innerText = k.sinclasificar;
+  document.getElementById('res-fecha').innerText = p.fecha;
+  renderDetalle(p.rows);
+
+  document.getElementById('alerta-reproceso').classList.toggle('hidden', p.estado !== 'reproceso');
+  document.getElementById('alerta-bloqueo').classList.toggle('hidden', p.estado !== 'bloqueado');
+
+  const btn = document.getElementById('btn-reejecutar');
+  if (p.bloqueado) {
+    btn.disabled = true;
+    btn.classList.add('opacity-40','cursor-not-allowed');
+    btn.classList.remove('hover:bg-blue-700');
+  } else {
+    btn.disabled = false;
+    btn.classList.remove('opacity-40','cursor-not-allowed');
+    btn.classList.add('hover:bg-blue-700');
+  }
+
+  const tbody = document.getElementById('tabla-versiones');
+  tbody.innerHTML = p.versiones.map(v => `
+    <tr class="border-b border-slate-100">
+      <td class="py-2 font-mono font-bold text-slate-700">${v.v}</td>
+      <td class="py-2 text-slate-600">${v.origen}</td>
+      <td class="py-2 text-slate-500">${v.fecha}</td>
+      <td class="py-2 text-center">${v.vigente ? '<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">Vigente</span>' : '<span class="text-slate-400 text-[10px]">—</span>'}</td>
+      <td class="py-2 text-center text-[11px] text-slate-500">${v.estado}</td>
+    </tr>
+  `).join('');
+}
+
+function cambiarPeriodo(val){
+  periodoActual = val;
+  pintarPeriodo();
+}
+
+function reejecutarComparacion(){
+  const p = PERIODOS[periodoActual];
+  if (p.bloqueado) return;
+  document.getElementById('modal-progreso').classList.remove('hidden');
+  const barra = document.getElementById('barra-progreso');
+  barra.style.width = '0%';
+  setTimeout(()=> barra.style.width = '45%', 100);
+  setTimeout(()=> barra.style.width = '80%', 700);
+  setTimeout(()=> {
+    barra.style.width = '100%';
+    setTimeout(() => {
+      document.getElementById('modal-progreso').classList.add('hidden');
+      const antes = p.rowsAntes || p.rows;
+      const despues = p.rowsDespues || p.rows;
+      const ka = contarKPI(antes), kd = contarKPI(despues);
+      document.getElementById('prev-coincidentes').innerText = ka.coincidentes;
+      document.getElementById('prev-excluidos').innerText = ka.excluidos;
+      document.getElementById('prev-sinclasificar').innerText = ka.sinclasificar;
+      document.getElementById('new-coincidentes').innerText = kd.coincidentes;
+      document.getElementById('new-excluidos').innerText = kd.excluidos;
+      document.getElementById('new-sinclasificar').innerText = kd.sinclasificar;
+      const huboReproceso = p.estado === 'reproceso';
+      document.getElementById('nota-memorando').classList.toggle('hidden', !huboReproceso);
+      document.getElementById('modal-resultado').classList.remove('hidden');
+
+      p.rows = despues;
+      p.rowsAntes = despues;
+      if (huboReproceso) {
+        p.estado = 'normal';
+        p.badge = {text:'Conciliado · versión vigente v2', cls:'bg-emerald-100 text-emerald-800'};
+        p.fecha = 'Última comparación: hoy · versión vigente v2 (reprocesada)';
+        p.versiones.forEach(v => v.estado = 'Comparada');
+      }
+      pintarPeriodo();
+      const huboCambios = JSON.stringify(ka) !== JSON.stringify(kd);
+      showToast('Comparación re-ejecutada', huboCambios ? 'El resultado de la conciliación fue actualizado con la versión reprocesada de EPR07R11.' : 'La comparación fue re-ejecutada; no se detectaron cambios respecto al resultado anterior.', 'success');
+    }, 300);
+  }, 1500);
+}
+
+function verHistorialResultados(){
+  showToast('Historial', 'Mostrando el resultado de la comparación previa a la última re-ejecución.', 'warning');
+}
+
+function simularEscenario(tipo){
+  if (tipo === 'incompleta') document.getElementById('modal-incompleta').classList.remove('hidden');
+}
+
+function abrirModalActualizacionManual(){
+  document.getElementById('modal-manual').classList.remove('hidden');
+}
+function guardarManual(){
+  cerrarModal('modal-manual');
+  showToast('Dato EPR-11 actualizado', 'El valor fue actualizado manualmente para fines del compendio estadístico. No se re-ejecutó la comparación del periodo (RN-0151).', 'success');
+}
+
+function cerrarModal(id){ document.getElementById(id).classList.add('hidden'); }
+
+pintarPeriodo();
+</script>
+</body>
+</html>

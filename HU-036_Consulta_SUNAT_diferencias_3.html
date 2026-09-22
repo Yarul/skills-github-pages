@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIIP - HU-036 Consulta a SUNAT sobre diferencias no clasificadas</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+body { font-family:'Inter',sans-serif; background-color:#f8fafc; }
+.toast-enter { transform:translateY(-100%); opacity:0; }
+.toast-show { transform:translateY(0); opacity:1; transition:all .3s ease-out; }
+.fade-in { animation: fadeIn .2s ease-out; }
+@keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex">
+
+<div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- Navegación SIIP -->
+<aside class="w-60 bg-[#0b1120] text-slate-300 shrink-0 min-h-screen py-5 flex flex-col">
+  <div class="px-5 flex items-center gap-2 mb-8">
+    <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center"><i class="fa-solid fa-shield-halved text-white text-sm"></i></div>
+    <div><p class="text-white font-bold text-sm leading-none">SIIP</p><p class="text-[10px] text-slate-500 leading-tight">Sistema Integrado de<br>Información Previsional</p></div>
+  </div>
+  <nav class="flex-1 space-y-0.5 text-sm">
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-house w-4"></i> Inicio</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-white font-semibold"><i class="fa-solid fa-scale-balanced w-4"></i> Conciliación SNP</p>
+    <p class="pl-11 py-1.5 text-slate-400 hover:text-white cursor-pointer">Comparación de abonos EPR07R11</p>
+    <p class="pl-11 py-1.5 bg-blue-600/90 text-white rounded-lg mx-2 pr-3 font-medium cursor-pointer">Diferencias no clasificadas</p>
+    <p class="pl-11 py-1.5 text-slate-400 hover:text-white cursor-pointer">Resultado de conciliación</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-folder-open w-4"></i> Repositorio SUNAT</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-chart-line w-4"></i> Proyección de recaudación</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-sliders w-4"></i> Configuración</p>
+  </nav>
+  <p class="flex items-center gap-2 px-5 py-2 text-slate-400 hover:text-white cursor-pointer text-sm"><i class="fa-solid fa-arrow-right-from-bracket w-4"></i> Cerrar sesión</p>
+</aside>
+
+<!-- Contenido Principal -->
+<div class="flex-1 flex flex-col">
+
+<header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-lg font-bold text-slate-800">HU-M2.1.2.1 - 036 · Consulta a SUNAT sobre diferencias no clasificadas</h1>
+    <p class="text-xs text-slate-500">Diferencias que no corresponden a penalidad bancaria ni a nota de ajuste · Periodo: Setiembre 2026</p>
+  </div>
+  <div class="flex items-center gap-2 border-l border-slate-200 pl-4">
+    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">EC</div>
+    <div class="text-xs"><p class="font-semibold text-slate-800">Elsa Chuquiano</p><p class="text-slate-500">Analista de Recaudación</p></div>
+  </div>
+</header>
+
+<main class="flex-1 p-8 space-y-6">
+
+  <!-- Estado de la conciliación -->
+  <div id="banner-estado" class="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+    <i class="fa-solid fa-hourglass-half text-amber-600"></i>
+    <div class="flex-1 text-xs">
+      <p class="font-bold text-amber-900">Conciliación del periodo: <span id="estado-conciliacion">Pendiente de clasificación</span></p>
+      <p class="text-amber-700" id="detalle-estado">Existen 3 diferencias que no corresponden a penalidad bancaria ni a nota de ajuste. Genere la consulta a SUNAT para dar seguimiento formal.</p>
+    </div>
+    <span id="badge-reenvios" class="hidden text-[11px] bg-amber-600 text-white font-bold px-2.5 py-1 rounded-full whitespace-nowrap"></span>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <div class="lg:col-span-2 space-y-6">
+      <!-- Tabla de diferencias -->
+      <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1.5"></i>Diferencias no clasificadas</p>
+          <button id="btn-generar-consulta" onclick="abrirModalConsulta()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5">
+            <i class="fa-solid fa-paper-plane"></i> Generar consulta a SUNAT
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs border-collapse">
+            <thead>
+              <tr class="text-slate-500 bg-slate-50 border-b border-slate-200">
+                <th class="text-left py-2 px-2 font-semibold">Fecha</th>
+                <th class="text-left py-2 px-2 font-semibold">N° Nota de abono</th>
+                <th class="text-right py-2 px-2 font-semibold">EPR07R11 (S/)</th>
+                <th class="text-right py-2 px-2 font-semibold">Estado Bancario (S/)</th>
+                <th class="text-center py-2 px-2 font-semibold">Cuadra</th>
+                <th class="text-left py-2 px-2 font-semibold">Clasificación</th>
+                <th class="text-left py-2 px-2 font-semibold">Motivo registrado</th>
+                <th class="text-center py-2 px-2 font-semibold">Estado</th>
+                <th class="text-center py-2 px-2 font-semibold">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-diferencias"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel lateral: historial de envíos -->
+    <div class="lg:col-span-1 space-y-4">
+      <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+        <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-envelope-circle-check text-blue-600 mr-1.5"></i>Historial de comunicación con SUNAT</p>
+        <div id="historial-envios" class="space-y-2.5 text-xs">
+          <p class="text-slate-400 italic">Aún no se ha generado ninguna consulta para este periodo.</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+        <p class="font-bold text-sm text-slate-800">Configuración del destinatario</p>
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">Especialista SUNAT</span>
+          <span class="font-semibold text-slate-800" id="dest-actual">jhernandez@sunat.gob.pe</span>
+        </div>
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-slate-500">Con copia a</span>
+          <span class="font-semibold text-slate-800">Equipo de Recaudación</span>
+        </div>
+        <button onclick="simularSinDestinatario()" class="w-full mt-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-[11px] font-bold py-1.5 rounded transition">
+          <i class="fa-solid fa-flask mr-1"></i> Simular: destinatario no configurado
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- Modal: Generar consulta -->
+<div id="modal-consulta" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-envelope text-blue-600"></i> Correo de consulta a SUNAT (editable)</h3>
+      <button onclick="cerrarModal('modal-consulta')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div class="space-y-3 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-600 mb-1">Para</label>
+        <input id="correo-para" type="text" value="jhernandez@sunat.gob.pe" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-600 mb-1">Con copia (CC)</label>
+        <input id="correo-cc" type="text" value="equipo.recaudacion@onp.gob.pe" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-600 mb-1">Asunto</label>
+        <input id="correo-asunto" type="text" value="Consulta sobre diferencias no clasificadas - Recaudación SNP - Setiembre 2026" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-600 mb-1">Cuerpo del mensaje</label>
+        <textarea id="correo-cuerpo" rows="10" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono text-[11px] leading-relaxed focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+        <p class="text-[10px] text-slate-500 mt-1"><i class="fa-solid fa-circle-info mr-1"></i>Si edita el contenido, el sistema conserva el detalle original de las diferencias como referencia (excepción 4).</p>
+      </div>
+    </div>
+    <div class="flex justify-between items-center pt-2 border-t">
+      <button onclick="simularFallaEnvio()" class="text-[11px] text-rose-600 hover:underline">Simular falla en el envío</button>
+      <div class="flex gap-2">
+        <button onclick="cerrarModal('modal-consulta')" class="text-xs border border-slate-300 text-slate-700 font-semibold rounded-lg px-4 py-2 hover:bg-slate-100">Cancelar</button>
+        <button onclick="enviarConsulta()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2 rounded-lg transition shadow-sm">
+          <i class="fa-solid fa-paper-plane mr-1"></i> Enviar consulta
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Detalle del correo enviado -->
+<div id="modal-detalle-correo" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-envelope-open-text text-blue-600"></i> Detalle del correo enviado</h3>
+      <button onclick="cerrarModal('modal-detalle-correo')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div class="space-y-3 text-xs">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="border border-slate-200 rounded-lg p-2.5"><p class="text-[10px] font-bold text-slate-500 uppercase">Envío</p><p id="detalle-numero" class="font-semibold text-slate-800 mt-0.5"></p></div>
+        <div class="border border-slate-200 rounded-lg p-2.5"><p class="text-[10px] font-bold text-slate-500 uppercase">Fecha de envío</p><p id="detalle-fecha" class="font-semibold text-slate-800 mt-0.5"></p></div>
+      </div>
+      <div class="border border-slate-200 rounded-lg p-2.5"><p class="text-[10px] font-bold text-slate-500 uppercase">Para</p><p id="detalle-para" class="text-slate-700 mt-0.5"></p></div>
+      <div class="border border-slate-200 rounded-lg p-2.5"><p class="text-[10px] font-bold text-slate-500 uppercase">Con copia (CC)</p><p id="detalle-cc" class="text-slate-700 mt-0.5"></p></div>
+      <div class="border border-slate-200 rounded-lg p-2.5"><p class="text-[10px] font-bold text-slate-500 uppercase">Asunto</p><p id="detalle-asunto" class="text-slate-700 mt-0.5"></p></div>
+      <div>
+        <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">Cuerpo del mensaje</p>
+        <pre id="detalle-cuerpo" class="w-full border border-slate-200 rounded-lg px-3 py-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap bg-slate-50 text-slate-700"></pre>
+      </div>
+    </div>
+    <div class="flex justify-end pt-2 border-t">
+      <button onclick="cerrarModal('modal-detalle-correo')" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar motivo -->
+<div id="modal-motivo" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-pen text-blue-600"></i> Detalle de la diferencia pendiente</h3>
+      <button onclick="cerrarModal('modal-motivo')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <p class="text-xs text-slate-600">N° Nota de abono: <span class="font-mono font-bold" id="motivo-nota"></span></p>
+    <textarea id="motivo-texto" rows="4" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+    <div class="flex justify-end gap-2 pt-2 border-t">
+      <button onclick="cerrarModal('modal-motivo')" class="text-xs border border-slate-300 text-slate-700 font-semibold rounded-lg px-4 py-2 hover:bg-slate-100">Cancelar</button>
+      <button onclick="guardarMotivo()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg">Guardar detalle</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cierre manual -->
+<div id="modal-cierre" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-check-double text-emerald-600"></i> Cerrar diferencia por otro medio</h3>
+      <button onclick="cerrarModal('modal-cierre')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <p class="text-xs text-slate-600">N° Nota de abono: <span class="font-mono font-bold" id="cierre-nota"></span></p>
+    <div>
+      <label class="block text-xs font-semibold text-slate-600 mb-1">Motivo de cierre</label>
+      <textarea id="cierre-texto" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Ej. Confirmado telefónicamente con el especialista de SUNAT el 16/09/2026, corresponde a un reproceso ya regularizado."></textarea>
+    </div>
+    <div class="flex justify-end gap-2 pt-2 border-t">
+      <button onclick="cerrarModal('modal-cierre')" class="text-xs border border-slate-300 text-slate-700 font-semibold rounded-lg px-4 py-2 hover:bg-slate-100">Cancelar</button>
+      <button onclick="cerrarManual()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg">Confirmar cierre</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// epr / banco: solo uno de los dos tiene valor en una diferencia sin clasificar (el otro lado no tiene correlato)
+let DIFERENCIAS = [
+  { nota:'70011313', fecha:'11/09/2026', epr:18420.50, banco:null, motivo:'Diferencia detectada en comparación EPR07R11 vs Estado Bancario BN. No corresponde a penalidad bancaria (3er dígito ≠ 9) ni a nota de ajuste (prefijo ≠ 600).', estado:'no_clasificada' },
+  { nota:'70031195', fecha:'17/09/2026', epr:5310.00, banco:null, motivo:'Importe registrado en EPR07R11 sin correlato en el Estado Bancario del BN del periodo.', estado:'no_clasificada' },
+  { nota:'70031187', fecha:'18/09/2026', epr:null, banco:2100.75, motivo:'Abono presente en Estado Bancario del BN sin correlato en la estadística EPR07R11.', estado:'no_clasificada' }
+];
+let envios = 0;
+const MAX_REENVIOS = 3;
+let historialEnvios = [];
+
+function showToast(titulo, mensaje, tipo) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const bg = tipo==='success' ? 'bg-emerald-700' : tipo==='error' ? 'bg-rose-700' : 'bg-amber-700';
+  toast.className = 'pointer-events-auto p-3 rounded-xl shadow-lg text-white text-xs max-w-sm ' + bg + ' toast-enter';
+  toast.innerHTML = '<strong class="block font-bold">' + titulo + '</strong><span class="text-[11px] opacity-90">' + mensaje + '</span>';
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add('toast-show'), 10);
+  setTimeout(() => { toast.classList.remove('toast-show'); setTimeout(() => toast.remove(), 300); }, 4200);
+}
+function fmt(n){ return n.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function montoDiferencia(d){ return d.epr!=null ? d.epr : d.banco; }
+
+const ESTADO_BADGE = {
+  no_clasificada: {text:'No clasificada', cls:'bg-slate-100 text-slate-700'},
+  pendiente: {text:'Pendiente de revisión', cls:'bg-amber-100 text-amber-800'},
+  cerrada: {text:'Cerrada (otro medio)', cls:'bg-emerald-100 text-emerald-800'}
+};
+
+function renderTabla(){
+  const tbody = document.getElementById('tabla-diferencias');
+  tbody.innerHTML = DIFERENCIAS.map((d,i) => {
+    const epr = d.epr==null ? '—' : fmt(d.epr);
+    const banco = d.banco==null ? '—' : fmt(d.banco);
+    const cuadraHtml = d.estado === 'cerrada'
+      ? '<span class="text-slate-400">—</span>'
+      : '<span class="inline-flex items-center gap-1.5 text-rose-700 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>✗ No cuadra</span>';
+    const clasifHtml = '<span class="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 text-[11px] font-semibold px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Sin clasificar (pendiente de consulta a SUNAT)</span>';
+    return `
+    <tr class="border-b border-slate-100">
+      <td class="py-2.5 px-2 text-slate-500 whitespace-nowrap">${d.fecha}</td>
+      <td class="py-2.5 px-2 font-mono font-semibold text-slate-700 whitespace-nowrap">${d.nota}</td>
+      <td class="py-2.5 px-2 text-right font-mono">${epr}</td>
+      <td class="py-2.5 px-2 text-right font-mono">${banco}</td>
+      <td class="py-2.5 px-2 text-center whitespace-nowrap">${cuadraHtml}</td>
+      <td class="py-2.5 px-2">${clasifHtml}</td>
+      <td class="py-2.5 px-2 text-slate-600 max-w-[220px]">${d.motivo}</td>
+      <td class="py-2.5 px-2 text-center"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${ESTADO_BADGE[d.estado].cls}">${ESTADO_BADGE[d.estado].text}</span></td>
+      <td class="py-2.5 px-2 text-center whitespace-nowrap">
+        <button onclick="editarMotivo(${i})" class="text-blue-600 hover:text-blue-800 text-xs px-1.5" title="Editar motivo"><i class="fa-solid fa-pen"></i></button>
+        ${d.estado==='pendiente' ? `<button onclick="abrirCierre(${i})" class="text-emerald-600 hover:text-emerald-800 text-xs px-1.5" title="Cerrar por otro medio"><i class="fa-solid fa-check-double"></i></button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function actualizarBanner(){
+  const banner = document.getElementById('banner-estado');
+  const estadoTxt = document.getElementById('estado-conciliacion');
+  const detalle = document.getElementById('detalle-estado');
+  const badge = document.getElementById('badge-reenvios');
+  const btn = document.getElementById('btn-generar-consulta');
+
+  const pendientes = DIFERENCIAS.filter(d=>d.estado!=='cerrada');
+  const hayPendientesRevision = DIFERENCIAS.some(d=>d.estado==='pendiente');
+
+  if (hayPendientesRevision) {
+    banner.className = 'bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3';
+    estadoTxt.innerText = 'Pendiente de revisión';
+    detalle.innerText = 'La conciliación permanece en estado "Pendiente de revisión" mientras se espera la respuesta de SUNAT a la consulta enviada.';
+    badge.classList.remove('hidden');
+    badge.innerText = envios + '/' + MAX_REENVIOS + ' envíos';
+    btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Reenviar consulta a SUNAT';
+  } else if (pendientes.length === 0) {
+    banner.className = 'bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3';
+    estadoTxt.innerText = 'Sin diferencias pendientes';
+    detalle.innerText = 'Todas las diferencias no clasificadas fueron atendidas. La conciliación puede continuar su flujo normal.';
+    badge.classList.add('hidden');
+    btn.classList.add('hidden');
+  } else {
+    banner.className = 'bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3';
+    estadoTxt.innerText = 'Pendiente de clasificación';
+    detalle.innerText = `Existen ${pendientes.length} diferencia(s) que no corresponden a penalidad bancaria ni a nota de ajuste. Genere la consulta a SUNAT para dar seguimiento formal.`;
+    badge.classList.add('hidden');
+  }
+
+  if (envios >= MAX_REENVIOS) {
+    detalle.innerText = 'Se alcanzó el número máximo de reenvíos (' + MAX_REENVIOS + ') sin respuesta de SUNAT dentro del plazo. La conciliación se mantiene "Pendiente de revisión" y puede avanzar con el reporte preliminar de la recaudación.';
+  }
+}
+
+function abrirModalConsulta(){
+  const cuerpo = 'Estimado especialista de SUNAT:\n\nPor medio del presente, se solicita su apoyo para determinar si las siguientes diferencias detectadas en la conciliación de la recaudación del SNP corresponden a un reproceso de la estadística EPR07R11 o a una nota de ajuste pendiente de comunicar:\n\n' +
+    DIFERENCIAS.filter(d=>d.estado!=='cerrada').map(d => `- ${d.nota} · ${d.fecha} · S/ ${fmt(montoDiferencia(d))}\n  ${d.motivo}`).join('\n\n') +
+    '\n\nQuedamos atentos a su respuesta.\n\nEquipo de Recaudación - ONP';
+  document.getElementById('correo-cuerpo').value = cuerpo;
+  document.getElementById('modal-consulta').classList.remove('hidden');
+}
+
+function renderHistorialEnvios(){
+  const historial = document.getElementById('historial-envios');
+  if (historialEnvios.length === 0) {
+    historial.innerHTML = '<p class="text-slate-400 italic">Aún no se ha generado ninguna consulta para este periodo.</p>';
+    return;
+  }
+  historial.innerHTML = historialEnvios.map((h, idx) => `
+    <div class="border border-slate-200 rounded-lg p-2.5 fade-in">
+      <div class="flex items-center justify-between">
+        <p class="font-semibold text-slate-700">Envío N° ${h.numero}</p>
+        <span class="text-[10px] text-slate-400">${h.fecha}</span>
+      </div>
+      <p class="text-[11px] text-slate-500">Para: ${h.para}</p>
+      <button onclick="verDetalleCorreo(${idx})" class="mt-1.5 text-[11px] text-blue-600 hover:underline font-semibold flex items-center gap-1">
+        <i class="fa-solid fa-eye"></i> Ver detalle del correo
+      </button>
+    </div>
+  `).join('');
+}
+
+function verDetalleCorreo(idx){
+  const h = historialEnvios[idx];
+  document.getElementById('detalle-numero').innerText = 'N° ' + h.numero;
+  document.getElementById('detalle-fecha').innerText = h.fecha;
+  document.getElementById('detalle-para').innerText = h.para;
+  document.getElementById('detalle-cc').innerText = h.cc;
+  document.getElementById('detalle-asunto').innerText = h.asunto;
+  document.getElementById('detalle-cuerpo').innerText = h.cuerpo;
+  document.getElementById('modal-detalle-correo').classList.remove('hidden');
+}
+
+function enviarConsulta(){
+  envios++;
+  DIFERENCIAS.forEach(d => { if (d.estado === 'no_clasificada') d.estado = 'pendiente'; });
+
+  historialEnvios.unshift({
+    numero: envios,
+    fecha: 'hoy, ' + new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'}),
+    para: document.getElementById('correo-para').value,
+    cc: document.getElementById('correo-cc').value,
+    asunto: document.getElementById('correo-asunto').value,
+    cuerpo: document.getElementById('correo-cuerpo').value
+  });
+
+  cerrarModal('modal-consulta');
+  renderTabla();
+  renderHistorialEnvios();
+  actualizarBanner();
+  if (envios >= MAX_REENVIOS) {
+    showToast('Límite de reenvíos alcanzado', 'Se realizaron ' + MAX_REENVIOS + ' reenvíos sin respuesta de SUNAT. La conciliación permanece "Pendiente de revisión" y puede avanzar con el reporte preliminar.', 'warning');
+  } else {
+    showToast('Consulta enviada a SUNAT', 'El correo fue enviado al especialista de SUNAT, con copia al equipo de Recaudación. La conciliación pasó a estado "Pendiente de revisión".', 'success');
+  }
+}
+
+let idxMotivo = null;
+function editarMotivo(i){
+  idxMotivo = i;
+  document.getElementById('motivo-nota').innerText = DIFERENCIAS[i].nota;
+  document.getElementById('motivo-texto').value = DIFERENCIAS[i].motivo;
+  document.getElementById('modal-motivo').classList.remove('hidden');
+}
+function guardarMotivo(){
+  DIFERENCIAS[idxMotivo].motivo = document.getElementById('motivo-texto').value;
+  cerrarModal('modal-motivo');
+  renderTabla();
+  showToast('Detalle actualizado', 'La información adicional fue asociada a la diferencia seleccionada.', 'success');
+}
+
+let idxCierre = null;
+function abrirCierre(i){
+  idxCierre = i;
+  document.getElementById('cierre-nota').innerText = DIFERENCIAS[i].nota;
+  document.getElementById('cierre-texto').value = '';
+  document.getElementById('modal-cierre').classList.remove('hidden');
+}
+function cerrarManual(){
+  DIFERENCIAS[idxCierre].estado = 'cerrada';
+  DIFERENCIAS[idxCierre].motivo += ' [Cerrada manualmente: ' + (document.getElementById('cierre-texto').value || 'sin detalle adicional') + ']';
+  cerrarModal('modal-cierre');
+  renderTabla();
+  actualizarBanner();
+  showToast('Diferencia cerrada', 'Se registró el cambio de estado dejando constancia del motivo de cierre.', 'success');
+}
+
+function simularSinDestinatario(){
+  showToast('Especialista SUNAT no configurado', 'No existe un destinatario configurado. El sistema impide el envío del correo hasta completar la configuración.', 'error');
+}
+function simularFallaEnvio(){
+  showToast('Falla en el envío', 'El correo no pudo enviarse por un problema del servicio. Se conservó como borrador para reintentar el envío.', 'error');
+}
+
+function cerrarModal(id){ document.getElementById(id).classList.add('hidden'); }
+
+renderTabla();
+actualizarBanner();
+</script>
+</body>
+</html>

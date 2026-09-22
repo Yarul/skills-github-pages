@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIIP - HU-037 Simulación de la proyección mensual de la recaudación del SNP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+body { font-family:'Inter',sans-serif; background-color:#f8fafc; }
+.toast-enter { transform:translateY(-100%); opacity:0; }
+.toast-show { transform:translateY(0); opacity:1; transition:all .3s ease-out; }
+.drag-active { border-color:#2563eb !important; background-color:#eff6ff !important; }
+.tab-active { background:#2563eb; color:#fff; }
+.fade-in { animation: fadeIn .2s ease-out; }
+@keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+.bar { transition: width .6s ease; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex">
+
+<div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- Navegación SIIP -->
+<aside class="w-60 bg-[#0b1120] text-slate-300 shrink-0 min-h-screen py-5 flex flex-col">
+  <div class="px-5 flex items-center gap-2 mb-8">
+    <div class="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center"><i class="fa-solid fa-shield-halved text-white text-sm"></i></div>
+    <div><p class="text-white font-bold text-sm leading-none">SIIP</p><p class="text-[10px] text-slate-500 leading-tight">Sistema Integrado de<br>Información Previsional</p></div>
+  </div>
+  <nav class="flex-1 space-y-0.5 text-sm">
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-house w-4"></i> Inicio</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-scale-balanced w-4"></i> Conciliación SNP</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-folder-open w-4"></i> Repositorio SUNAT</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-white font-semibold"><i class="fa-solid fa-chart-line w-4"></i> Proyección de recaudación</p>
+    <p class="pl-11 py-1.5 bg-blue-600/90 text-white rounded-lg mx-2 pr-3 font-medium cursor-pointer">Simulación mensual</p>
+    <p class="flex items-center gap-2 px-5 py-2 text-slate-300 hover:bg-white/5 rounded-lg mx-2 cursor-pointer"><i class="fa-solid fa-sliders w-4"></i> Configuración</p>
+  </nav>
+  <p class="flex items-center gap-2 px-5 py-2 text-slate-400 hover:text-white cursor-pointer text-sm"><i class="fa-solid fa-arrow-right-from-bracket w-4"></i> Cerrar sesión</p>
+</aside>
+
+<!-- Contenido Principal -->
+<div class="flex-1 flex flex-col">
+
+<header class="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-lg font-bold text-slate-800">HU-M2.1.2.1 - 037 · Simulación de la proyección mensual de la recaudación del SNP</h1>
+    <p class="text-xs text-slate-500">Prorrateo del oficio semestral de SUNAT según distribución diaria EPR07R16 del mismo mes del año anterior</p>
+  </div>
+  <div class="flex items-center gap-3">
+    <label class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer select-none">
+      <input type="checkbox" id="toggle-opg" onchange="toggleVistaOPG()" class="rounded text-blue-600"> Vista de solo consulta (OPG)
+    </label>
+    <div class="flex items-center gap-2 border-l border-slate-200 pl-4">
+      <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">RS</div>
+      <div class="text-xs"><p class="font-semibold text-slate-800">R. Sifuentes</p><p class="text-slate-500">Analista de Recaudación</p></div>
+    </div>
+  </div>
+</header>
+
+<main class="flex-1 p-8 space-y-6">
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Panel de insumos -->
+    <div class="lg:col-span-1 space-y-4" id="panel-insumos">
+      <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-file-contract text-blue-600 mr-1.5"></i>Oficio de proyección semestral</p>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-3 border border-slate-200 text-xs space-y-1.5">
+          <p class="font-semibold text-slate-800" id="oficio-numero">Oficio N° 001480-2026-SUNAT/8H1400</p>
+          <p class="text-slate-500"><i class="fa-regular fa-calendar mr-1"></i>Vigente desde: <span id="oficio-fecha">28/08/2026</span></p>
+          <p class="text-slate-500"><i class="fa-solid fa-hashtag mr-1"></i>Cobertura: <span id="oficio-cobertura">Ene 2026 – Dic 2029</span></p>
+          <span class="inline-block text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full mt-1">Vigente</span>
+        </div>
+        <button data-req-analista onclick="abrirModalOficio()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Cargar nuevo oficio semestral
+        </button>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
+        <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-sliders text-blue-600 mr-1.5"></i>Parámetros de la simulación</p>
+        <div>
+          <label class="block text-[11px] font-semibold text-slate-600 mb-1">Mes a simular</label>
+          <select id="sel-mes" data-req-analista onchange="cambiarMes()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <option value="2026-07">Julio 2026</option>
+            <option value="2026-08">Agosto 2026</option>
+            <option value="2026-09" selected>Setiembre 2026</option>
+            <option value="2026-10">Octubre 2026</option>
+          </select>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-3 border border-slate-200 text-[11px] space-y-1">
+          <div class="flex justify-between"><span class="text-slate-500">Importe proyectado (oficio)</span><span class="font-mono font-bold" id="param-monto"></span></div>
+          <div class="flex justify-between items-center"><span class="text-slate-500">Referencia EPR07R16</span><span class="flex items-center gap-1.5"><span class="font-semibold" id="param-referencia"></span><button onclick="document.getElementById('modal-epr07r16').classList.remove('hidden')" class="text-blue-600 hover:text-blue-800" title="Ver estadísticas de recaudación EPR07R16"><i class="fa-solid fa-up-right-from-square text-[10px]"></i></button></span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Total referencia (año anterior)</span><span class="font-mono" id="param-total-ref"></span></div>
+          <div class="flex justify-between"><span class="text-slate-500">Días hábiles del mes</span><span class="font-semibold" id="param-dias"></span></div>
+        </div>
+        <button id="btn-simular" data-req-analista onclick="ejecutarSimulacion()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-calculator"></i> Ejecutar simulación
+        </button>
+        <div class="flex gap-2">
+          <button data-req-analista onclick="simularCuadre('mayor')" class="flex-1 text-[10px] border border-slate-300 rounded-lg px-2 py-1.5 hover:bg-slate-100">RN-0165: más días hábiles</button>
+          <button data-req-analista onclick="simularCuadre('menor')" class="flex-1 text-[10px] border border-slate-300 rounded-lg px-2 py-1.5 hover:bg-slate-100">RN-0165: menos días hábiles</button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-2">
+        <p class="font-bold text-sm text-slate-800">Historial de oficios utilizados</p>
+        <div id="historial-oficios" class="space-y-2 text-[11px]"></div>
+      </div>
+    </div>
+
+    <!-- Panel de resultados -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <div id="estado-vacio-sim" class="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center text-slate-400">
+        <i class="fa-solid fa-calculator text-3xl mb-2"></i>
+        <p class="text-sm font-semibold">Aún no se ha ejecutado la simulación para este mes</p>
+        <p class="text-xs">Configure los parámetros y presione "Ejecutar simulación".</p>
+      </div>
+
+      <div id="resultado-sim" class="hidden fade-in space-y-6">
+
+        <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-table text-blue-600 mr-1.5"></i>Proyección Recaudación del SNP – Diaria</p>
+            <div class="flex gap-1" id="tabs-moneda">
+              <button onclick="cambiarVista('soles', event)" class="tab-active px-3 py-1.5 rounded-lg text-[11px] font-bold border border-blue-600">En Soles</button>
+              <button onclick="cambiarVista('miles', event)" class="bg-white text-slate-600 px-3 py-1.5 rounded-lg text-[11px] font-bold border border-slate-300 hover:border-blue-400">En miles de Soles</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-[11px]">
+              <thead>
+                <tr class="bg-slate-200 text-slate-700">
+                  <th class="border border-slate-300 p-1.5 text-center" rowspan="2">Día</th>
+                  <th class="border border-slate-300 p-1.5 text-center" colspan="2" id="th-mes-label">Mes</th>
+                  <th class="border border-slate-300 p-1.5 text-center" rowspan="2">% acum.</th>
+                </tr>
+                <tr class="bg-slate-100 text-slate-600">
+                  <th class="border border-slate-300 p-1.5 text-right">Día</th>
+                  <th class="border border-slate-300 p-1.5 text-right">Acumulado</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-proyeccion"></tbody>
+            </table>
+          </div>
+          <div class="flex flex-wrap gap-4 pt-2 border-t border-slate-100">
+            <div class="bg-slate-800 text-white rounded-lg px-4 py-2 text-xs font-bold" id="total-proyeccion"></div>
+            <div class="bg-slate-100 text-slate-700 rounded-lg px-4 py-2 text-xs" id="oficio-usado"></div>
+          </div>
+        </div>
+
+        <!-- Comparación gráfica proyección vs real -->
+        <div class="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <p class="font-bold text-sm text-slate-800"><i class="fa-solid fa-chart-simple text-blue-600 mr-1.5"></i>Comparación gráfica: proyección vs. recaudación real conciliada</p>
+            <span class="text-[10px] text-slate-400 italic">RN-0164 · valor de referencia, no reemplaza la conciliación real</span>
+          </div>
+          <div class="space-y-3" id="grafico-comparacion"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- Modal: Cargar oficio -->
+<div id="modal-oficio" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-file-contract text-blue-600"></i> Cargar oficio de proyección semestral (SUNAT)</h3>
+      <button onclick="cerrarModal('modal-oficio')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div id="oficio-drop" class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-blue-50/40 transition cursor-pointer" onclick="analizarOficio()">
+      <i class="fa-solid fa-cloud-arrow-up text-blue-600 text-2xl mb-2"></i>
+      <p class="font-semibold text-xs text-slate-800">Arrastre aquí el Anexo de proyección de SUNAT (PDF) o haga clic para examinar</p>
+      <p class="text-[11px] text-slate-500 mt-1">Ej. "04. Anexo proyec. recau. 2026-2029.pdf" · Cuadro 1: Proyección de la Recaudación del SNP</p>
+    </div>
+    <div id="oficio-preview" class="hidden space-y-3">
+      <div class="flex items-center gap-3 bg-blue-50/60 border border-blue-200 rounded-lg p-3">
+        <i class="fa-solid fa-file-pdf text-rose-600 text-2xl"></i>
+        <div class="text-xs flex-1">
+          <p class="font-bold text-slate-800">04. Anexo proyec. recau. 2026-2029.pdf</p>
+          <p class="text-slate-500">Cuadro 1 detectado · Fuente: SUNAT, División de Estadística - Gerencia de Estudios Económicos</p>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <p class="text-[11px] font-bold text-blue-900 text-center mb-1">CUADRO 1 · Proyección de la Recaudación del SNP 2026-2029 (En millones de soles)</p>
+        <table class="w-full border-collapse border border-slate-300 text-[10.5px]">
+          <thead>
+            <tr class="bg-slate-700 text-white">
+              <th class="border border-slate-400 p-1">Mes</th><th class="border border-slate-400 p-1 text-right">2026 (P)</th><th class="border border-slate-400 p-1 text-right">2027 (P)</th><th class="border border-slate-400 p-1 text-right">2028 (P)</th><th class="border border-slate-400 p-1 text-right">2029 (P)</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-cuadro1"></tbody>
+        </table>
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">N° de Oficio SUNAT</label>
+        <input id="input-numero-oficio" type="text" value="001480-2026-SUNAT/8H1400" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Vigente desde</label>
+        <input id="input-vigente-desde" type="date" value="2026-08-28" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Cobertura</label>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="border border-slate-200 rounded-lg p-2 space-y-1.5">
+            <p class="text-[10px] font-bold text-slate-500 uppercase">De</p>
+            <div class="grid grid-cols-2 gap-1.5">
+              <select id="input-cobertura-de-mes" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option>Ene</option><option>Feb</option><option>Mar</option><option>Abr</option><option>May</option><option>Jun</option><option>Jul</option><option>Ago</option><option>Set</option><option>Oct</option><option>Nov</option><option>Dic</option>
+              </select>
+              <select id="input-cobertura-de-anio" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option>2026</option><option>2027</option><option>2028</option><option>2029</option>
+              </select>
+            </div>
+          </div>
+          <div class="border border-slate-200 rounded-lg p-2 space-y-1.5">
+            <p class="text-[10px] font-bold text-slate-500 uppercase">Hasta</p>
+            <div class="grid grid-cols-2 gap-1.5">
+              <select id="input-cobertura-hasta-mes" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option>Ene</option><option>Feb</option><option>Mar</option><option>Abr</option><option>May</option><option>Jun</option><option>Jul</option><option>Ago</option><option>Set</option><option>Oct</option><option>Nov</option><option selected>Dic</option>
+              </select>
+              <select id="input-cobertura-hasta-anio" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option>2026</option><option>2027</option><option>2028</option><option selected>2029</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t">
+        <button onclick="cerrarModal('modal-oficio')" class="text-xs border border-slate-300 text-slate-700 font-semibold rounded-lg px-4 py-2 hover:bg-slate-100">Cancelar</button>
+        <button onclick="activarOficio()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg"><i class="fa-solid fa-check mr-1"></i> Activar como oficio vigente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Estadísticas de recaudación EPR07R16 -->
+<div id="modal-epr07r16" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-5xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-table-list text-blue-600"></i> Estadísticas de recaudación</h3>
+      <button onclick="cerrarModal('modal-epr07r16')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div class="flex items-center justify-between text-[11px] text-slate-600 font-mono">
+      <span>OF.CENTRAL</span>
+      <span class="font-bold text-slate-800 text-xs text-center">ESTADISTICAS DE RECAUDACION<br><span class="font-normal text-[10px]">( POR DIA : ONP )</span></span>
+      <span>EPR07R16</span>
+    </div>
+    <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+      <span>01/10/2026 04:07:34</span>
+      <span>Pag. 1</span>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="lg:col-span-2 overflow-x-auto">
+        <table class="w-full border-collapse text-[10.5px]">
+          <thead>
+            <tr class="bg-slate-200 text-slate-700">
+              <th class="border border-slate-300 p-1 text-left"></th>
+              <th class="border border-slate-300 p-1 text-right">Recaudación Bancaria (A)</th>
+              <th class="border border-slate-300 p-1 text-right">Prico con Replica (B)</th>
+              <th class="border border-slate-300 p-1 text-right">Prico Nacional C</th>
+              <th class="border border-slate-300 p-1 text-right">Recaudación Aduanera (D)</th>
+              <th class="border border-slate-300 p-1 text-right">Total ( A+B+C+D )</th>
+              <th class="border border-slate-300 p-1 text-right">%</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-epr07r16"></tbody>
+        </table>
+      </div>
+      <div class="border border-slate-200 rounded-lg p-3 text-[10.5px] space-y-2 font-mono">
+        <p class="font-bold text-slate-700 font-sans text-[11px] border-b pb-1">OTROS DATOS DE RECAUDACION</p>
+        <div>
+          <p class="font-bold text-slate-600 font-sans">MES ACTUAL</p>
+          <p>Setiembre</p>
+          <p>A) Acumulado al 30/09/2026: <span class="font-bold">410,844,119.19</span></p>
+        </div>
+        <div>
+          <p class="font-bold text-slate-600 font-sans">MES ANTERIOR</p>
+          <p>B) Total: Agosto: <span class="font-bold">414,033,508.48</span></p>
+          <p>C) Acumulado al mismo día hábil 31/08/2026: <span class="font-bold">414,033,508.48</span></p>
+        </div>
+        <div>
+          <p class="font-bold text-slate-600 font-sans">MISMO MES AÑO ANTERIOR</p>
+          <p>D) Setiembre/2025: <span class="font-bold">397,943,808.83</span></p>
+          <p>E) Acumulado al mismo día hábil 30/09/2025: <span class="font-bold">397,943,808.83</span></p>
+        </div>
+        <div>
+          <p class="font-bold text-slate-600 font-sans">AÑO EN CURSO</p>
+          <p>F) Enero-Agosto/2026: <span class="font-bold">2,470,735,757.64</span></p>
+          <p>G) ( A + F ): <span class="font-bold">2,881,579,876.83</span></p>
+        </div>
+        <div>
+          <p class="font-bold text-slate-600 font-sans">AÑO ANTERIOR</p>
+          <p>H) Enero-Agosto/2025: <span class="font-bold">2,334,001,950.15</span></p>
+          <p>I) ( E + H ): <span class="font-bold">2,731,945,758.98</span></p>
+        </div>
+        <div>
+          <p class="font-bold text-slate-600 font-sans">VARIACIONES PORCENTUALES</p>
+          <p>Setiembre-2026/Agosto-2026 (A:C): <span class="font-bold text-rose-700">-0.77</span></p>
+          <p>Setiembre-2026/Setiembre-2025 (A:E): <span class="font-bold text-emerald-700">+3.24</span></p>
+          <p>HASTA Setiembre-2026/Setiembre-2025 (G:I): <span class="font-bold text-emerald-700">+5.48</span></p>
+        </div>
+      </div>
+    </div>
+    <p class="text-[10px] text-slate-500 italic">- Cifras conciliadas con los estados de cuenta del Banco de la Nación. · Importe en Nuevos Soles.</p>
+    <div class="flex justify-end pt-2 border-t">
+      <button onclick="cerrarModal('modal-epr07r16')" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Ver archivo del oficio utilizado en el historial -->
+<div id="modal-archivo-oficio" class="fixed inset-0 bg-slate-900/50 z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b pb-3">
+      <h3 class="font-bold text-base text-slate-800 flex items-center gap-2"><i class="fa-solid fa-paperclip text-blue-600"></i> Archivo utilizado</h3>
+      <button onclick="cerrarModal('modal-archivo-oficio')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+    </div>
+    <div class="flex items-center gap-3 bg-blue-50/60 border border-blue-200 rounded-lg p-3">
+      <i class="fa-solid fa-file-pdf text-rose-600 text-2xl"></i>
+      <div class="text-xs flex-1">
+        <p class="font-bold text-slate-800" id="archivo-oficio-nombre"></p>
+        <p class="text-slate-500" id="archivo-oficio-meta"></p>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <p class="text-[11px] font-bold text-blue-900 text-center mb-1">CUADRO 1 · Proyección de la Recaudación del SNP 2026-2029 (En millones de soles)</p>
+      <table class="w-full border-collapse border border-slate-300 text-[10.5px]">
+        <thead>
+          <tr class="bg-slate-700 text-white">
+            <th class="border border-slate-400 p-1">Mes</th><th class="border border-slate-400 p-1 text-right">2026 (P)</th><th class="border border-slate-400 p-1 text-right">2027 (P)</th><th class="border border-slate-400 p-1 text-right">2028 (P)</th><th class="border border-slate-400 p-1 text-right">2029 (P)</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-archivo-cuadro1"></tbody>
+      </table>
+    </div>
+    <div class="flex justify-end pt-2 border-t">
+      <button onclick="cerrarModal('modal-archivo-oficio')" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2 rounded-lg">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Datos reales tomados del Anexo SUNAT (Cuadro 1, en millones de soles) ----
+const CUADRO1 = {
+  meses: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'],
+  2026: [420,408,420,394,415,414,428,439,435,438,437,456],
+  2027: [421,419,424,422,438,426,436,447,442,445,445,464],
+  2028: [442,440,444,443,460,447,457,469,464,467,466,487],
+  2029: [465,462,467,466,484,470,481,493,488,491,490,512]
+};
+
+// ---- Datos reales tomados de la imagen "Estadísticas de recaudación" (EPR07R16, adaptado a Setiembre 2026 - 30 días) ----
+const ARCHIVO_OFICIO = '04. Anexo proyec. recau. 2026-2029.pdf';
+const EPR07R16_DATA = [
+  {f:'1/09/2025', a:14280424.63, pct:3.48},
+  {f:'2/09/2025', a:9407138.52, pct:2.29},
+  {f:'3/09/2025', a:6420690.75, pct:1.56},
+  {f:'4/09/2025', a:null, pct:null},
+  {f:'5/09/2025', a:null, pct:null},
+  {f:'6/09/2025', a:7013721.46, pct:1.71},
+  {f:'7/09/2025', a:7273185.91, pct:1.77},
+  {f:'8/09/2025', a:6376463.43, pct:1.55},
+  {f:'9/09/2025', a:7336202.66, pct:1.79},
+  {f:'10/09/2025', a:6789703.36, pct:1.65},
+  {f:'11/09/2025', a:null, pct:null},
+  {f:'12/09/2025', a:null, pct:null},
+  {f:'13/09/2025', a:8481000.08, pct:2.06},
+  {f:'14/09/2025', a:10969640.80, pct:2.67},
+  {f:'15/09/2025', a:15511122.22, pct:3.78},
+  {f:'16/09/2025', a:45842027.48, pct:11.16},
+  {f:'17/09/2025', a:49459617.01, pct:12.04},
+  {f:'18/09/2025', a:null, pct:null},
+  {f:'19/09/2025', a:null, pct:null},
+  {f:'20/09/2025', a:42610200.68, pct:10.37},
+  {f:'21/09/2025', a:45143798.37, pct:10.99},
+  {f:'22/09/2025', a:45084858.79, pct:10.97},
+  {f:'23/09/2025', a:null, pct:null},
+  {f:'24/09/2025', a:40743007.98, pct:9.92},
+  {f:'25/09/2025', a:null, pct:null},
+  {f:'26/09/2025', a:null, pct:null},
+  {f:'27/09/2025', a:24902942.51, pct:6.06},
+  {f:'28/09/2025', a:null, pct:null},
+  {f:'29/09/2025', a:null, pct:null},
+  {f:'30/09/2025', a:17198372.55, pct:4.19}
+];
+
+// ---- Distribución diaria de referencia (patrón EPR07R16 tomado del Simulador_proyección.xlsx) ----
+// Fracción acumulada del total mensual (columna F del simulador)
+const DIAS_HABILES = [1,2,3,4,7,8,9,10,11,14,15,16,17,18,21,22,23,24,25,28,29,30];
+const FRAC_ACUM = [0.032638845991338844,0.054735831714068664,0.07120581294962164,0.087733937239566,0.10181675365404036,0.12182998385444636,0.13423554321094724,0.15197519207136934,0.17094521583547287,0.1931148597785843,0.22310101229418985,0.3311637653800005,0.4458264946902834,0.5462335099793756,0.6602134186630125,0.7526822376039269,0.8619224460345153,0.901092406444183,0.9299407038613099,0.9495895303638668,0.9716908811417155,1.0000000000000002];
+// Recaudación diaria real del año anterior usada como base del prorrateo (columna R del simulador, Set. 2025)
+const REF_DIARIA = [13552240.42,9175068.97,6838634.72,6862776.77,5847440.62,8309855.91,5151013.09,7365823.73,7876697.69,9205237.98,12450794.01,44869613.67,47610043.42,41690812.58,47326523.92,38394729.58,45358514.47,16264077.5,11978335.95,8158548.89,9176881.42,11754459.24];
+const REF_TOTAL = REF_DIARIA.reduce((a,b)=>a+b,0);
+
+const MESES_INFO = {
+  '2026-07': {label:'Julio', mesIdx:6, anio:2026, refLabel:'EPR07R16 · Julio 2025'},
+  '2026-08': {label:'Agosto', mesIdx:7, anio:2026, refLabel:'EPR07R16 · Agosto 2025'},
+  '2026-09': {label:'Setiembre', mesIdx:8, anio:2026, refLabel:'EPR07R16 · Setiembre 2025'},
+  '2026-10': {label:'Octubre', mesIdx:9, anio:2026, refLabel:'EPR07R16 · Octubre 2025'}
+};
+
+let vistaMoneda = 'soles';
+let ultimaSimulacion = null;
+let historial = [];
+let numeroOficioVigente = '001480-2026-SUNAT/8H1400';
+
+function showToast(titulo, mensaje, tipo) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const bg = tipo==='success' ? 'bg-emerald-700' : tipo==='error' ? 'bg-rose-700' : 'bg-amber-700';
+  toast.className = 'pointer-events-auto p-3 rounded-xl shadow-lg text-white text-xs max-w-sm ' + bg + ' toast-enter';
+  toast.innerHTML = '<strong class="block font-bold">' + titulo + '</strong><span class="text-[11px] opacity-90">' + mensaje + '</span>';
+  container.appendChild(toast);
+  setTimeout(() => toast.classList.add('toast-show'), 10);
+  setTimeout(() => { toast.classList.remove('toast-show'); setTimeout(() => toast.remove(), 300); }, 4200);
+}
+function fmt(n, dec){ return n.toLocaleString('en-US', {minimumFractionDigits:dec===undefined?2:dec, maximumFractionDigits:dec===undefined?2:dec}); }
+
+function montoMesActual(){
+  const info = MESES_INFO[document.getElementById('sel-mes').value];
+  const millones = CUADRO1[info.anio][info.mesIdx];
+  return millones * 1000000;
+}
+
+function actualizarParametros(){
+  const key = document.getElementById('sel-mes').value;
+  const info = MESES_INFO[key];
+  document.getElementById('param-monto').innerText = 'S/ ' + fmt(montoMesActual(),0) + ' (' + CUADRO1[info.anio][info.mesIdx] + ' MM)';
+  document.getElementById('param-referencia').innerText = info.refLabel;
+  document.getElementById('param-total-ref').innerText = 'S/ ' + fmt(REF_TOTAL,0);
+  document.getElementById('param-dias').innerText = DIAS_HABILES.length + ' días';
+  document.getElementById('resultado-sim').classList.add('hidden');
+  document.getElementById('estado-vacio-sim').classList.remove('hidden');
+}
+
+function cambiarMes(){ actualizarParametros(); }
+
+function ejecutarSimulacion(diasOverride){
+  const key = document.getElementById('sel-mes').value;
+  const info = MESES_INFO[key];
+  const total = montoMesActual();
+
+  let frac = FRAC_ACUM;
+  let dias = DIAS_HABILES;
+  let nota = '';
+  if (diasOverride === 'mayor') { dias = DIAS_HABILES.concat([31]); frac = FRAC_ACUM.map(f=>f*0.955).concat([1.0]); nota='mayor'; }
+  if (diasOverride === 'menor') { dias = DIAS_HABILES.slice(0,-1); const last = FRAC_ACUM[FRAC_ACUM.length-2]; frac = FRAC_ACUM.slice(0,-1).map(f=>f/last); nota='menor'; }
+
+  let filas = [];
+  let prevFrac = 0;
+  for (let i=0;i<dias.length;i++){
+    const fracDia = frac[i] - prevFrac;
+    const importeDia = fracDia * total;
+    const acumulado = frac[i] * total;
+    filas.push({dia:dias[i], importe:importeDia, acumulado:acumulado, pct:frac[i]*100});
+    prevFrac = frac[i];
+  }
+  ultimaSimulacion = {mes:info.label + ' ' + info.anio, total, filas, oficio:numeroOficioVigente};
+
+  historial.unshift({mes:info.label + ' ' + info.anio, oficio:numeroOficioVigente, fecha:new Date().toLocaleDateString('es-PE'), total, archivo:ARCHIVO_OFICIO});
+  renderHistorial();
+
+  document.getElementById('estado-vacio-sim').classList.add('hidden');
+  document.getElementById('resultado-sim').classList.remove('hidden');
+  renderTablaProyeccion();
+  renderGraficoComparacion();
+
+  if (nota === 'mayor') showToast('RN-0165 verificada', 'El mes actual tiene más días hábiles que el mes de referencia. El resultado cuadra correctamente con el total proyectado, sin descuadres por el exceso de días.', 'success');
+  else if (nota === 'menor') showToast('RN-0165 verificada', 'El mes actual tiene menos días hábiles que el mes de referencia. El resultado cuadra correctamente con el total proyectado, sin descuadres por el déficit de días.', 'success');
+  else showToast('Simulación ejecutada', 'Se prorrateó el importe proyectado por SUNAT entre los días hábiles de ' + info.label + ' ' + info.anio + ', usando la distribución diaria de ' + info.refLabel + '.', 'success');
+}
+
+function simularCuadre(tipo){ ejecutarSimulacion(tipo); }
+
+function renderTablaProyeccion(){
+  const div = vistaMoneda === 'soles' ? 1 : 1000;
+  const dec = vistaMoneda === 'soles' ? 2 : 3;
+  document.getElementById('th-mes-label').innerText = ultimaSimulacion.mes + (vistaMoneda==='miles' ? ' (miles S/)' : ' (S/)');
+  document.getElementById('tabla-proyeccion').innerHTML = ultimaSimulacion.filas.map(f => `
+    <tr>
+      <td class="border border-slate-300 p-1 text-center">${f.dia}</td>
+      <td class="border border-slate-300 p-1 text-right font-mono">${fmt(f.importe/div, dec)}</td>
+      <td class="border border-slate-300 p-1 text-right font-mono">${fmt(f.acumulado/div, dec)}</td>
+      <td class="border border-slate-300 p-1 text-right font-mono">${f.pct.toFixed(2)}%</td>
+    </tr>
+  `).join('');
+  document.getElementById('total-proyeccion').innerHTML = '<i class="fa-solid fa-coins mr-1.5"></i>Total proyectado ' + ultimaSimulacion.mes + ': S/ ' + fmt(ultimaSimulacion.total,2) + ' (' + fmt(ultimaSimulacion.total/1000,2) + ' miles)';
+  document.getElementById('oficio-usado').innerHTML = '<i class="fa-solid fa-file-contract mr-1.5"></i>Insumo: Oficio N° ' + ultimaSimulacion.oficio;
+}
+
+function cambiarVista(v, evt){
+  vistaMoneda = v;
+  document.querySelectorAll('#tabs-moneda button').forEach(b=>{ b.classList.remove('tab-active','border-blue-600'); b.classList.add('bg-white','text-slate-600','border-slate-300'); });
+  evt.currentTarget.classList.add('tab-active','border-blue-600'); evt.currentTarget.classList.remove('bg-white','text-slate-600','border-slate-300');
+  renderTablaProyeccion();
+}
+
+function renderGraficoComparacion(){
+  // Recaudación real conciliada simulada (valor de referencia para el ejemplo)
+  const real = ultimaSimulacion.total * 0.965;
+  const max = Math.max(ultimaSimulacion.total, real);
+  const pctProy = (ultimaSimulacion.total/max*100).toFixed(1);
+  const pctReal = (real/max*100).toFixed(1);
+  const variacionPct = ((real - ultimaSimulacion.total) / ultimaSimulacion.total) * 100;
+  const variacionTxt = (variacionPct >= 0 ? '+' : '') + variacionPct.toFixed(2) + '%';
+  const variacionColor = variacionPct >= 0 ? 'text-emerald-700' : 'text-rose-700';
+  document.getElementById('grafico-comparacion').innerHTML = `
+    <div>
+      <div class="flex justify-between text-[11px] mb-1"><span class="font-semibold text-blue-700">Proyección simulada</span><span class="font-mono">S/ ${fmt(ultimaSimulacion.total,0)}</span></div>
+      <div class="w-full bg-slate-100 rounded-full h-4"><div class="bar bg-blue-600 h-4 rounded-full" style="width:${pctProy}%"></div></div>
+    </div>
+    <div>
+      <div class="flex justify-between text-[11px] mb-1"><span class="font-semibold text-emerald-700">Recaudación real conciliada (estimada)</span><span class="font-mono">S/ ${fmt(real,0)}</span></div>
+      <div class="w-full bg-slate-100 rounded-full h-4"><div class="bar bg-emerald-600 h-4 rounded-full" style="width:${pctReal}%"></div></div>
+    </div>
+    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+      <span class="text-[11px] font-semibold text-slate-600">Variación (real vs. proyección)</span>
+      <span class="text-xs font-mono font-bold ${variacionColor}">${variacionTxt}</span>
+    </div>
+    <p class="text-[10px] text-slate-500 italic pt-1">La diferencia entre ambos valores es referencial (excepción 5): la simulación no reemplaza el resultado de la conciliación real del periodo.</p>
+  `;
+}
+
+function renderHistorial(){
+  const cont = document.getElementById('historial-oficios');
+  if (historial.length === 0) { cont.innerHTML = '<p class="text-slate-400 italic">Sin simulaciones registradas aún.</p>'; return; }
+  cont.innerHTML = historial.slice(0,6).map((h,i) => `
+    <div class="flex items-center justify-between border border-slate-200 rounded-lg p-2 ${i===0?'bg-blue-50/60 border-blue-200':''}">
+      <div><p class="font-semibold text-slate-700">${h.mes}</p><p class="text-[10px] text-slate-500">Oficio ${h.oficio} · ${h.fecha}</p></div>
+      <div class="flex items-center gap-2">
+        ${i===0 ? '<span class="text-[10px] bg-blue-600 text-white font-bold px-2 py-0.5 rounded-full">Vigente</span>' : '<span class="text-[10px] text-slate-400">Historial</span>'}
+        <button onclick="verArchivoOficio(${i})" class="text-blue-600 hover:text-blue-800 text-[11px]" title="Ver archivo utilizado"><i class="fa-solid fa-paperclip"></i></button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function verArchivoOficio(idx){
+  const h = historial[idx];
+  document.getElementById('archivo-oficio-nombre').innerText = h.archivo;
+  document.getElementById('archivo-oficio-meta').innerText = 'Oficio N° ' + h.oficio + ' · Usado en la simulación de ' + h.mes;
+  document.getElementById('tabla-archivo-cuadro1').innerHTML = CUADRO1.meses.map((m,i) => `
+    <tr class="${m==='Set' ? 'bg-blue-50 font-bold' : ''}">
+      <td class="border border-slate-300 p-1 font-semibold">${m}${m==='Set' ? ' *' : ''}</td>
+      <td class="border border-slate-300 p-1 text-right font-mono">${CUADRO1[2026][i]}</td>
+      <td class="border border-slate-300 p-1 text-right font-mono">${CUADRO1[2027][i]}</td>
+      <td class="border border-slate-300 p-1 text-right font-mono">${CUADRO1[2028][i]}</td>
+      <td class="border border-slate-300 p-1 text-right font-mono">${CUADRO1[2029][i]}</td>
+    </tr>
+  `).join('') + `<tr class="bg-slate-600 text-white font-bold"><td class="border border-slate-700 p-1">TOTAL</td><td class="border border-slate-700 p-1 text-right font-mono">${CUADRO1[2026].reduce((a,b)=>a+b,0)}</td><td class="border border-slate-700 p-1 text-right font-mono">${CUADRO1[2027].reduce((a,b)=>a+b,0)}</td><td class="border border-slate-700 p-1 text-right font-mono">${CUADRO1[2028].reduce((a,b)=>a+b,0)}</td><td class="border border-slate-700 p-1 text-right font-mono">${CUADRO1[2029].reduce((a,b)=>a+b,0)}</td></tr>`;
+  document.getElementById('modal-archivo-oficio').classList.remove('hidden');
+}
+
+function renderEPR07R16(){
+  const tbody = document.getElementById('tabla-epr07r16');
+  let totalA = 0;
+  tbody.innerHTML = EPR07R16_DATA.map(r => {
+    if (r.a == null) {
+      return `<tr><td class="border border-slate-300 p-1">${r.f}</td><td class="border border-slate-300 p-1 text-right"></td><td class="border border-slate-300 p-1 text-right"></td><td class="border border-slate-300 p-1 text-right"></td><td class="border border-slate-300 p-1 text-right"></td><td class="border border-slate-300 p-1 text-right"></td><td class="border border-slate-300 p-1 text-right"></td></tr>`;
+    }
+    totalA += r.a;
+    return `<tr><td class="border border-slate-300 p-1">${r.f}</td><td class="border border-slate-300 p-1 text-right font-mono">${fmt(r.a)}</td><td class="border border-slate-300 p-1 text-right font-mono">0.00</td><td class="border border-slate-300 p-1 text-right font-mono">0.00</td><td class="border border-slate-300 p-1 text-right font-mono">0.00</td><td class="border border-slate-300 p-1 text-right font-mono">${fmt(r.a)}</td><td class="border border-slate-300 p-1 text-right font-mono">${r.pct.toFixed(2)}</td></tr>`;
+  }).join('') + `<tr class="bg-slate-600 text-white font-bold"><td class="border border-slate-700 p-1">TOTALES:</td><td class="border border-slate-700 p-1 text-right font-mono">${fmt(totalA)}</td><td class="border border-slate-700 p-1 text-right font-mono">0.00</td><td class="border border-slate-700 p-1 text-right font-mono">0.00</td><td class="border border-slate-700 p-1 text-right font-mono">0.00</td><td class="border border-slate-700 p-1 text-right font-mono">${fmt(totalA)}</td><td class="border border-slate-700 p-1 text-right font-mono">100.00</td></tr>`;
+}
+
+function abrirModalOficio(){
+  document.getElementById('oficio-preview').classList.add('hidden');
+  document.getElementById('oficio-drop').classList.remove('hidden');
+  document.getElementById('modal-oficio').classList.remove('hidden');
+}
+function analizarOficio(){
+  showToast('Analizando documento', 'Extrayendo el Cuadro 1 del Anexo de proyección remitido por SUNAT…', 'warning');
+  setTimeout(() => {
+    document.getElementById('oficio-drop').classList.add('hidden');
+    document.getElementById('oficio-preview').classList.remove('hidden');
+    document.getElementById('tabla-cuadro1').innerHTML = CUADRO1.meses.map((m,i) => `
+      <tr class="${m==='Set' ? 'bg-blue-50 font-bold' : ''}">
+        <td class="border border-slate-300 p-1 font-semibold">${m}${m==='Set' ? ' *' : ''}</td>
+        <td class="border border-slate-300 p-1 text-right font-mono">${CUADRO1[2026][i]}</td>
+        <td class="border border-slate-300 p-1 text-right font-mono">${CUADRO1[2027][i]}</td>
+        <td class="border border-slate-300 p-1 text-right font-mono">${CUADRO1[2028][i]}</td>
+        <td class="border border-slate-300 p-1 text-right font-mono">${CUADRO1[2029][i]}</td>
+      </tr>
+    `).join('') + `<tr class="bg-slate-600 text-white font-bold"><td class="border border-slate-700 p-1">TOTAL</td><td class="border border-slate-700 p-1 text-right font-mono">${CUADRO1[2026].reduce((a,b)=>a+b,0)}</td><td class="border border-slate-700 p-1 text-right font-mono">${CUADRO1[2027].reduce((a,b)=>a+b,0)}</td><td class="border border-slate-700 p-1 text-right font-mono">${CUADRO1[2028].reduce((a,b)=>a+b,0)}</td><td class="border border-slate-700 p-1 text-right font-mono">${CUADRO1[2029].reduce((a,b)=>a+b,0)}</td></tr>`;
+    showToast('Validación exitosa', 'Se identificó el Cuadro 1 - Proyección de la Recaudación del SNP 2026-2029 (En millones de soles).', 'success');
+  }, 900);
+}
+function activarOficio(){
+  numeroOficioVigente = document.getElementById('input-numero-oficio').value;
+  document.getElementById('oficio-numero').innerText = 'Oficio N° ' + numeroOficioVigente;
+
+  const vigenteDesde = document.getElementById('input-vigente-desde').value;
+  if (vigenteDesde) {
+    const [y,m,d] = vigenteDesde.split('-');
+    document.getElementById('oficio-fecha').innerText = d + '/' + m + '/' + y;
+  } else {
+    document.getElementById('oficio-fecha').innerText = new Date().toLocaleDateString('es-PE');
+  }
+
+  const deMes = document.getElementById('input-cobertura-de-mes').value;
+  const deAnio = document.getElementById('input-cobertura-de-anio').value;
+  const hastaMes = document.getElementById('input-cobertura-hasta-mes').value;
+  const hastaAnio = document.getElementById('input-cobertura-hasta-anio').value;
+  document.getElementById('oficio-cobertura').innerText = deMes + ' ' + deAnio + ' – ' + hastaMes + ' ' + hastaAnio;
+
+  cerrarModal('modal-oficio');
+  showToast('Oficio activado', 'El nuevo oficio semestral quedó registrado como insumo vigente de la simulación (RF-00078). Se recomienda regenerar la simulación del mes en curso.', 'success');
+}
+
+function toggleVistaOPG(){
+  const activo = document.getElementById('toggle-opg').checked;
+  document.querySelectorAll('[data-req-analista]').forEach(el => {
+    el.disabled = activo;
+    el.classList.toggle('opacity-40', activo);
+    el.classList.toggle('cursor-not-allowed', activo);
+    el.classList.toggle('pointer-events-none', activo);
+  });
+  if (activo) showToast('Vista de solo consulta', 'Acceso de la Oficina de Planeamiento y Gestión (OPG): puede consultar la proyección mensual vigente, sin permisos de edición (RF-00079).', 'warning');
+}
+
+function cerrarModal(id){ document.getElementById(id).classList.add('hidden'); }
+
+const dz = document.getElementById('oficio-drop');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-active'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-active'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-active'); analizarOficio(); });
+
+renderEPR07R16();
+actualizarParametros();
+renderHistorial();
+</script>
+</body>
+</html>
